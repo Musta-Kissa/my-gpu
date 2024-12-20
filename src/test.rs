@@ -120,7 +120,8 @@ impl Camera {
     }
 }
 
-use self::my_gpu::Binds;
+use std::ops::Deref;
+
 
 fn vertex(vert: [f64; 3], binds: &mut Binds) -> Vec4 {
     let bind0: Matrix<4,4> = *binds.cast_ref(0);
@@ -128,6 +129,8 @@ fn vertex(vert: [f64; 3], binds: &mut Binds) -> Vec4 {
     let out = Vec4::from_slice(&vert);
     bind0 * out
 }
+use self::my_gpu::Binds;
+
 #[test]
 fn main() {
     let mut window = Window::new("minifb", 600 * 16 / 9, 600);
@@ -155,7 +158,7 @@ fn main() {
         surface_cofig: surface_config,
     };
 
-    let mut binds: Binds = Binds( Vec::new() );
+    let mut binds: Binds = Binds(Vec::new());
     binds.push(Box::new(view_proj));
 
     let mut gpu = my_gpu::Gpu::new(

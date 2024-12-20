@@ -18,6 +18,8 @@ use my_math::vec::Vec4;
 use my_math::matrix::Matrix;
 
 const WHITE: u32 = !0u32;
+const BLACK: u32 = 0u32;
+const RED: u32 = ((1u32<<9)-1)<<16;
 
 fn line_plane_intersect(plnae_p: Vec3, plane_n: Vec3, start: Vec3, end: Vec3) -> Vec3 {
     let line_d = end - start;
@@ -134,9 +136,16 @@ impl<'s> Gpu<'s> {
             return;
         }
         unsafe {
-            *self.surface.add(pixel.y as usize * self.config.surface_cofig.width + pixel.x as usize) = 
-                *self.surface.add(pixel.y as usize * self.config.surface_cofig.width + pixel.x as usize) | color;
+            //*self.surface.add(pixel.y as usize * self.config.surface_cofig.width + pixel.x as usize) = 
+                //*self.surface.add(pixel.y as usize * self.config.surface_cofig.width + pixel.x as usize) | color;
+            *self.surface.add(pixel.y as usize * self.config.surface_cofig.width + pixel.x as usize) = color;
         }
+    }
+
+    fn line_clip(&mut self, start: Vec4, end: Vec4, color: u32) {
+        let start = self.clip_to_screen(start) ;
+        let end = self.clip_to_screen(end) ;
+        self.line(&start, &end, color);
     }
 
     fn line(&mut self, start: &IVec2, end: &IVec2, color: u32) {
@@ -180,18 +189,58 @@ impl<'s> Gpu<'s> {
             }
         }
     }
-    fn is_in_triangle( p1: IVec2, p2: IVec2, p3: IVec2, p_x: i64, p_y: i64) -> bool {
-        let cross_12 = (p_x - p1.x) * (p2.y - p1.y) - (p_y - p1.y) * (p2.x - p1.x);
-        let cross_23 = (p_x - p2.x) * (p3.y - p2.y) - (p_y - p2.y) * (p3.x - p2.x);
-        let cross_31 = (p_x - p3.x) * (p1.y - p3.y) - (p_y - p3.y) * (p1.x - p3.x);
 
-        let all_pos = cross_12.is_positive() && cross_23.is_positive() && cross_31.is_positive();
-        let all_neg = cross_12.is_negative() && cross_23.is_negative() && cross_31.is_negative();
+    /// draws a filled triangle using the scanline fill algorithm
+    fn fill_triangle(&mut self, p1: IVec2, p2: IVec2, p3: IVec2, color: u32) {
+        let mut points = vec![p1,p2,p3];
+        points.sort_by(|a, b| (a.y).cmp(&b.y));
+        let p1 = points[0];
+        let p2 = points[1];
+        let p3 = points[2];
 
-        all_pos ^ all_neg
+        if p2.y == p3.y {
+            let slope12 = (p1.x - p2.x) as f64 / (p1.y - p2.y) as f64;
+            let slope13 = (p1.x - p3.x) as f64 / (p1.y - p3.y) as f64;
+
+            for y in p1.y ..= p3.y {
+                let mut x1 = (slope12 *(y-p2.y) as f64).round() as i64 + p2.x;
+                let mut x2 = (slope13 *(y-p3.y) as f64).round() as i64 + p3.x;
+
+                if x1 > x2 {
+                    std::mem::swap(&mut x1, &mut x2);
+                }
+                
+                for x in x1..=x2 {
+                    self.set_pixel(ivec2!(x,y), color);
+                }
+            }
+        } else if p1.y == p2.y {
+            let slope13 = (p1.x - p3.x) as f64 / (p1.y - p3.y) as f64;
+            let slope23 = (p2.x - p3.x) as f64 / (p2.y - p3.y) as f64;
+
+            for y in p1.y ..= p3.y {
+                let mut x1 = (slope13 *(y-p3.y) as f64).round() as i64 + p3.x;
+                let mut x2 = (slope23 *(y-p2.y) as f64).round() as i64 + p2.x;
+
+                if x1 > x2 {
+                    std::mem::swap(&mut x1, &mut x2);
+                }
+                
+                for x in x1..=x2 {
+                    self.set_pixel(ivec2!(x,y), color);
+                }
+            }
+
+        } else {
+            let slope = (p1.x-p3.x) as f64 / (p1.y - p3.y) as f64;
+            let d_y = p2.y;
+            let d_x = (slope * (p2.y - p3.y) as f64).ceil() as i64 + p3.x;
+            let d = ivec2!(d_x,d_y);
+            self.fill_triangle(p1, p2, d, color);
+            self.fill_triangle(d, p2, p3, color);
+        }
     }
-
-    fn draw_triangle_clip(&mut self, p1: Vec4, p2: Vec4, p3: Vec4) {
+    fn draw_triangle_clip(&mut self, p1: Vec4, p2: Vec4, p3: Vec4, color: u32) {
         let p1 = self.clip_to_screen(p1);
         let p2 = self.clip_to_screen(p2);
         let p3 = self.clip_to_screen(p3);
@@ -203,31 +252,26 @@ impl<'s> Gpu<'s> {
             return;
         } 
 
-        let right = max(max(p1.x, p2.x),p3.x);
-        let left = min(min(p1.x, p2.x),p3.x);
+        self.fill_triangle(p1, p2, p3, color);
+    }
+    fn draw_triangle_clip_wire(&mut self, p1: Vec4, p2: Vec4, p3: Vec4, color: u32) {
+        let p1 = self.clip_to_screen(p1);
+        let p2 = self.clip_to_screen(p2);
+        let p3 = self.clip_to_screen(p3);
 
-        let top = max(max(p1.y, p2.y),p3.y);
-        let bottom = min(min(p1.y, p2.y),p3.y);
+        let edge12 = p2 - p1;
+        let edge13 = p3 - p1;
+        let winding_order = edge12.cross(edge13);
+        if winding_order.is_negative() {
+            return;
+        } 
 
-        for x in left..right {
-            for y in bottom..top {
-                if Self::is_in_triangle(p1,p2,p3,x,y) {
-                    self.set_pixel(ivec2!(x,y), WHITE);
-                }
-            }
-        }
+        self.line(&p1, &p2, color);
+        self.line(&p2, &p3, color);
+        self.line(&p3, &p1, color);
     }
 
-    pub fn draw(&mut self) {
-        for t in self.vertex_buffer.chunks_exact(3) {
-            self.draw_triangle_clip(
-                vec4!(t[0][0] , t[0][1], t[0][2],1.0),
-                vec4!(t[1][0] , t[1][1], t[1][2],1.0),
-                vec4!(t[2][0] , t[2][1], t[2][2],1.0),
-            );
-        }
-    }
-    fn clip_triangle_on_plane2(plane_norm: Vec3, plane_p: Vec3, og_triangle: Triangle) -> Vec<Triangle> {
+    fn clip_triangle_on_plane(plane_norm: Vec3, plane_p: Vec3, og_triangle: Triangle) -> Vec<Triangle> {
         let mut inside_index_list: Vec<usize> = Vec::new();
         let mut outside_index_list: Vec<usize> = Vec::new();
 
@@ -282,14 +326,12 @@ impl<'s> Gpu<'s> {
                     new_triangle[inside_index_list[0]].to_vec3(),
                     new_triangle[outside_index_list[0]].to_vec3(),
                 ).to_vec4();
-                //println!("intersect_1: {:?}",intersect_1);
 
                 #[rustfmt::skip]
                 let intersect_2 = line_plane_intersect( plane_p, plane_norm,
                     new_triangle[inside_index_list[1]].to_vec3(),
                     new_triangle[outside_index_list[0]].to_vec3(),
                 ).to_vec4();
-                //println!("intersect_2: {:?}",intersect_2);
 
                 let mut out_triangle_1 = Triangle::new(
                     new_triangle[inside_index_list[0]],
@@ -347,7 +389,7 @@ impl<'s> Gpu<'s> {
             for i in 0..normals.len(){
                 let mut out:Vec<Triangle> = Vec::new();
                 for t in &triangles {
-                out.append(&mut Self::clip_triangle_on_plane2(
+                out.append(&mut Self::clip_triangle_on_plane(
                         normals[i],
                         plane_p[i],
                         *t,
@@ -356,8 +398,9 @@ impl<'s> Gpu<'s> {
                 triangles = out;
             }
 
-            for triangle in triangles {
-                self.draw_triangle_clip(triangle[0], triangle[1], triangle[2]);
+            for triangle in &triangles {
+                self.draw_triangle_clip(triangle[0], triangle[1], triangle[2],WHITE);
+                self.draw_triangle_clip_wire(triangle[0], triangle[1], triangle[2],BLACK);
             }
         }
     }
