@@ -237,8 +237,7 @@ fn main() {
         fov: 60.,
     };
 
-    let mut cam_trans_mat =
-        my_math::matrix::look_at_lh(camera.pos, camera.pos + camera.dir, camera.up);
+    let mut cam_trans_mat = my_math::matrix::look_at_lh(camera.pos, camera.pos + camera.dir, camera.up);
     let mut proj = my_math::matrix::proj_mat_wgpu(camera.fov, 16. / 9., camera.near, camera.far);
     let mut view_proj = proj * cam_trans_mat;
 
@@ -273,7 +272,7 @@ fn main() {
     );
 
     'draw_loop: while window.is_open() {
-        gpu.clear(my_gpu::BLACK);
+        gpu.clear(my_gpu::BLUE);
         gpu.draw_indexed(&verts,&indices);
 
         for key in window.window.get_keys() {
