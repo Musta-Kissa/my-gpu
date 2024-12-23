@@ -1,5 +1,8 @@
 use crate::SurfaceConfig;
+use crate::RED;
 use crate::WHITE;
+use crate::GREEN;
+use crate::MAGENTA;
 use minifb;
 use my_math::matrix::Matrix;
 
@@ -65,32 +68,6 @@ fn is_in_triangle(p1: IVec2, p2: IVec2, p3: IVec2, point: IVec2) -> bool {
 
     all_pos ^ all_neg
 }
-//#[rustfmt::skip]
-//pub const VERTICES: &[[f64; 3]] = &[
-    //[-0.5, -0.5,  0.5 + 3.],
-    //[-0.5,  0.5,  0.5 + 3.],
-    //[ 0.5, -0.5,  0.5 + 3.],
-    //[ 0.5,  0.5,  0.5 + 3.],
-    //[-0.5, -0.5, -0.5 + 3.],
-    //[-0.5,  0.5, -0.5 + 3.],
-    //[ 0.5, -0.5, -0.5 + 3.],
-    //[ 0.5,  0.5, -0.5 + 3.],
-//
-    //[-0.5, -0.5, -0.5 + 1.],
-    //[-0.5,  0.5, -0.5 + 1.],
-    //[ 0.5, -0.5, -0.5 + 1.],
-//];
-
-#[rustfmt::skip]
-pub const INDICES: &[u16] = &[
-    0, 2, 1,  1, 2, 3, 
-    6, 4, 7,  7, 4, 5, 
-    4, 0, 5,  5, 0, 1, 
-    2, 6, 3,  3, 6, 7, 
-    4, 6, 0,  0, 6, 2, 
-    1, 3, 5,  5, 3, 7, 
-    8, 9, 10,
-];
 
 use my_math::vec::Vec3;
 use my_math::vec::Vec4;
@@ -121,41 +98,8 @@ impl Camera {
     }
 }
 
-use std::ops::Deref;
 
-use self::my_gpu::Binds;
-use self::my_gpu::VertexIn;
-use self::my_gpu::VertexOut;
-
-fn vertex(vert:&VertexIn , binds: &mut Binds) -> VertexOut {
-    let bind0: Matrix<4,4> = *binds.cast_ref(0);
-
-    let out = VertexOut {
-        clip_pos: bind0 * vert.pos.to_vec4(1.0),
-        color: vert.color,
-        norm: vert.norm,
-    };
-    out
-}
-
-fn fragment(vert:&VertexOut, binds: &mut Binds) -> u32 {
-    let ambient = 0b0000_0111;
-    let light_dir:Vec3 = *binds.cast_ref(1);
-    //let light_dir:Vec3 = vec3!(-1.,10.,0.).norm();
-
-    let dot_light = light_dir.norm().dot(vert.norm);
-    let ratio = (dot_light + 1.)/2.;
-    let col = (((!0u8) as f64 * ratio).round() as u32) | ambient;
-    let mut out = 0u32;
-    out = out | (col << 16);
-    out = out | (col << 8);
-    out = out | (col << 0);
-    out
-}
-
-    
-
-fn gen_cube_mesh(pos:Vec3) -> Vec<VertexIn> {
+fn gen_cube_mesh(pos:Vec3,color:u32) -> Vec<VertexIn> {
     let verts = [
             [pos.x+1.,pos.y+0.,pos.z+0.],
             [pos.x+1.,pos.y+1.,pos.z+0.],
@@ -200,13 +144,63 @@ fn gen_cube_mesh(pos:Vec3) -> Vec<VertexIn> {
         for j in 0..4 {
             out.push(VertexIn {
                 pos: Vec3::from_slice(&quad[j]),
-                color: WHITE,
+                color: color,
                 norm: Vec3::from_slice(&normals[i]),
             })
         }
     }
     out
 }
+
+use self::my_gpu::Binds;
+use self::my_gpu::ClipPos;
+
+pub struct VertexIn {
+    pos: Vec3,
+    color: u32,
+    norm: Vec3,
+}
+pub struct VertexOut {
+    clip_pos: Vec4,
+    color: u32,
+    norm: Vec3,
+}
+impl ClipPos for VertexOut {
+    fn clip_pos(&self) -> Vec4 {
+        self.clip_pos
+    }
+}
+
+fn vertex(vert:&VertexIn , binds: &mut Binds) -> VertexOut {
+    let bind0: Matrix<4,4> = *binds.cast_ref(0).unwrap();
+
+    let out = VertexOut {
+        clip_pos: bind0 * vert.pos.to_vec4(1.0),
+        color: vert.color,
+        norm: vert.norm,
+    };
+    out
+}
+
+fn fragment(vert:&VertexOut, binds: &mut Binds) -> u32 {
+    let light_dir:Vec3 = *binds.cast_ref(1).unwrap();
+
+    let ambient = 0b0000_0100;
+
+    let dot_light = light_dir.norm().dot(vert.norm);
+    let dim_ratio = (dot_light + 1.)/2.;
+
+    let r_col = (( (vert.color << 8) >> 24) as f64 * dim_ratio).round() as u32 | ambient;
+    let g_col = (( (vert.color << 16) >> 24) as f64 * dim_ratio).round() as u32 | ambient;
+    let b_col = (( (vert.color << 24) >> 24) as f64 * dim_ratio).round() as u32 | ambient;
+    let mut out = 0u32;
+    out = out | (r_col << 16);
+    out = out | (g_col << 8);
+    out = out | (b_col << 0);
+    out
+}
+
+    
 pub fn gen_cube_indeces(vert_len: usize) -> Vec<u32> {
     let mut indices: Vec<u32> = Vec::new();
     indices.reserve_exact(vert_len * 10 / 4);
@@ -235,7 +229,7 @@ fn main() {
 
     let mut camera = Camera {
         up: vec3!(0., 1., 0.),
-        pos: vec3!(0.004214, 0., -2.006215412),
+        pos: vec3!(0., 0., -1.),
         dir: vec3!(0., 0., 1.),
         speed: 0.05,
         near: 0.1,
@@ -251,17 +245,24 @@ fn main() {
     let config = my_gpu::Config {
         surface_cofig: surface_config,
     };
-    let mut light_dir = vec3!(-5.,-5.,-5.);
+    let mut light_dir = vec3!(-5.,-2.,-4.);
 
     let mut binds: Binds = Binds(Vec::new());
-    binds.push(Box::new(view_proj));
-    binds.push(Box::new(light_dir));
-    let mut verts = gen_cube_mesh(vec3!(0.,0.,0.));
-    let mut verts_sun = gen_cube_mesh(light_dir);
+
+    binds.push(&mut view_proj);
+    binds.push(&mut light_dir);
+
+    let mut verts = gen_cube_mesh(vec3!(0.,0.,0.),WHITE);
+    let mut verts_sun = gen_cube_mesh(light_dir,MAGENTA);
+    let mut verts_green= gen_cube_mesh(vec3!(light_dir.x * -1.,light_dir.y * -1.,light_dir.z),GREEN);
     let mut indices = gen_cube_indeces(verts.len());
     let mut indices_sun = gen_cube_indeces(verts_sun.len() + verts.len());
+    let mut indices_green = gen_cube_indeces(verts_green.len() + verts_sun.len() + verts.len());
+
     verts.append(&mut verts_sun);
+    verts.append(&mut verts_green);
     indices.append(&mut indices_sun);
+    indices.append(&mut indices_green);
 
     let mut gpu = my_gpu::Gpu::new(
         config,
@@ -269,13 +270,11 @@ fn main() {
         binds,
         vertex,
         fragment,
-        &verts,
-        Some(&indices),
     );
 
     'draw_loop: while window.is_open() {
         gpu.clear(my_gpu::BLACK);
-        gpu.draw_indexed();
+        gpu.draw_indexed(&verts,&indices);
 
         for key in window.window.get_keys() {
             use minifb::Key;
@@ -342,8 +341,17 @@ fn main() {
             proj = my_math::matrix::proj_mat_wgpu(camera.fov, 16. / 9., camera.near, camera.far);
             view_proj = proj * cam_trans_mat;
 
-            gpu.binds[0] = Box::new(view_proj);
-            gpu.binds[1] = Box::new(light_dir);
+            verts = gen_cube_mesh(vec3!(0.,0.,0.),WHITE);
+            verts_sun = gen_cube_mesh(light_dir,MAGENTA);
+            verts_green= gen_cube_mesh(vec3!(light_dir.x * -1.,light_dir.y * -1.,light_dir.z),GREEN);
+            indices = gen_cube_indeces(verts.len());
+            indices_sun = gen_cube_indeces(verts_sun.len() + verts.len());
+            indices_green = gen_cube_indeces(verts_green.len() + verts_sun.len() + verts.len());
+
+            verts.append(&mut verts_sun);
+            verts.append(&mut verts_green);
+            indices.append(&mut indices_sun);
+            indices.append(&mut indices_green);
         }
 
         window.display();

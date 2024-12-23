@@ -15,9 +15,12 @@ use my_math::vec::IVec2;
 use my_math::vec::Vec3;
 use my_math::vec::Vec4;
 
-const WHITE: u32 = !0u32;
-const BLACK: u32 = 0u32;
-const RED: u32 = ((1u32 << 9) - 1) << 16;
+pub const WHITE: u32 = !0u32;
+pub const BLACK: u32 = 0u32;
+pub const RED: u32 = ((1u32 << 9) - 1) << 16;
+pub const GREEN: u32 = ((1u32 << 9) - 1) << 8;
+pub const BLUE: u32 = ((1u32 << 9) - 1) << 0;
+pub const MAGENTA: u32 = RED | BLUE;
 
 fn line_plane_intersect(plnae_p: Vec3, plane_n: Vec3, start: Vec3, end: Vec3) -> Vec3 {
     let line_d = end - start;
@@ -73,16 +76,18 @@ impl DerefMut for Triangle {
     }
 }
 
-pub struct Binds(Vec<Box<dyn Any>>);
+pub struct Binds(Vec<*mut dyn Any>);
 
 impl Binds {
-    pub fn cast_ref<'a, T: 'static>(&'a self, idx: usize) -> &'a T {
-        self.0[idx].downcast_ref::<T>().unwrap()
+    pub fn cast_ref<'a, T: 'static>(&'a self, idx: usize) -> Option<&'a T> {
+        unsafe {
+            (*self.0[idx]).downcast_ref::<T>()
+        }
     }
 }
 
 impl Deref for Binds {
-    type Target = Vec<Box<dyn Any>>;
+    type Target = Vec<*mut dyn Any>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -94,17 +99,8 @@ impl DerefMut for Binds {
     }
 }
 
-#[allow(dead_code)]
-pub struct VertexIn {
-    pos: Vec3,
-    color: u32,
-    norm: Vec3,
-}
-#[allow(dead_code)]
-pub struct VertexOut {
-    clip_pos: Vec4,
-    color: u32,
-    norm: Vec3,
+pub trait ClipPos {
+    fn clip_pos(&self) -> Vec4;
 }
 
 pub struct SurfaceConfig {
@@ -114,7 +110,7 @@ pub struct SurfaceConfig {
 pub struct Config {
     pub surface_cofig: SurfaceConfig,
 }
-pub struct Gpu<'s> {
+pub struct Gpu<VertexIn,VertexOut> {
     config: Config,
 
     surface: *mut u32,
@@ -122,11 +118,10 @@ pub struct Gpu<'s> {
 
     vertex_shader: fn(&VertexIn, &mut Binds) -> VertexOut,
     fragment_shader: fn(&VertexOut, &mut Binds) -> u32,
-    vertex_buffer: &'s [VertexIn],
-    index_buffer: Option<&'s [u32]>,
 }
 
-impl<'s> Gpu<'s> {
+#[allow(dead_code)]
+impl<VertexIn,VertexOut: ClipPos> Gpu<VertexIn,VertexOut> {
     // The vertex out must have a field of clip_pos
     pub fn new(
         config: Config,
@@ -134,8 +129,6 @@ impl<'s> Gpu<'s> {
         binds: Binds,
         vertex_shader: fn(&VertexIn, &mut Binds) -> VertexOut,
         fragment_shader: fn(&VertexOut,&mut Binds) -> u32,
-        vertex_buffer: &'s [VertexIn],
-        index_buffer: Option<&'s [u32]>,
     ) -> Self {
         Gpu {
             config,
@@ -143,8 +136,6 @@ impl<'s> Gpu<'s> {
             binds,
             vertex_shader,
             fragment_shader,
-            vertex_buffer,
-            index_buffer,
         }
     }
     fn pixel_fits(&self, pixel: IVec2) -> bool {
@@ -381,7 +372,7 @@ impl<'s> Gpu<'s> {
         }
     }
 
-    pub fn draw_indexed(&mut self) {
+    pub fn draw_indexed(&mut self, vertex_buffer: &[VertexIn], index_buffer: &[u32]) {
         let normals = &[
             vec3!(0., 0., 1.),
             vec3!(0., 1., 0.),
@@ -396,14 +387,14 @@ impl<'s> Gpu<'s> {
             vec3!(-1., 0., 0.),
             vec3!(1., 0., 0.),
         ];
-        for t in self.index_buffer.unwrap().chunks_exact(3) {
-            let vert_size = self.vertex_buffer.len() as u32;
+        for t in index_buffer.chunks_exact(3) {
+            let vert_size = vertex_buffer.len() as u32;
             if t[0] >= vert_size || t[1] >= vert_size || t[2] >= vert_size {
                 return;
             }
-            let p1 = &self.vertex_buffer[t[0] as usize];
-            let p2 = &self.vertex_buffer[t[1] as usize];
-            let p3 = &self.vertex_buffer[t[2] as usize];
+            let p1 = &vertex_buffer[t[0] as usize];
+            let p2 = &vertex_buffer[t[1] as usize];
+            let p3 = &vertex_buffer[t[2] as usize];
 
             let vertex_shader = self.vertex_shader;
 
@@ -411,9 +402,9 @@ impl<'s> Gpu<'s> {
             let p2 = vertex_shader(p2, &mut self.binds);
             let p3 = vertex_shader(p3, &mut self.binds);
 
-            let pos1 = p1.clip_pos;
-            let pos2 = p2.clip_pos;
-            let pos3 = p3.clip_pos;
+            let pos1 = p1.clip_pos();
+            let pos2 = p2.clip_pos();
+            let pos3 = p3.clip_pos();
 
             let fragment_shader = self.fragment_shader;
 
@@ -436,7 +427,8 @@ impl<'s> Gpu<'s> {
 
             for triangle in &triangles {
                 self.draw_triangle_clip(triangle[0], triangle[1], triangle[2], triangle.col);
-                self.draw_triangle_clip_wire(triangle[0], triangle[1], triangle[2], BLACK);
+                // FOR WIREFRAME 
+                // self.draw_triangle_clip_wire(triangle[0], triangle[1], triangle[2], triangle.col);
             }
         }
     }
