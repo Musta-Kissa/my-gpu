@@ -22,15 +22,6 @@ pub const GREEN: u32 = ((1u32 << 9) - 1) << 8;
 pub const BLUE: u32 = ((1u32 << 9) - 1) << 0;
 pub const MAGENTA: u32 = RED | BLUE;
 
-fn line_plane_intersect(plnae_p: Vec3, plane_n: Vec3, start: Vec3, end: Vec3) -> Vec3 {
-    let line_d = end - start;
-    let plane_d = plane_n.dot(plnae_p);
-
-    let t = (plane_d - plane_n.dot(start)) / plane_n.dot(line_d);
-
-    let intersect = start + line_d * t;
-    intersect
-}
 
 #[derive(Clone, Copy)]
 struct Triangle{
@@ -259,6 +250,7 @@ impl<VertexIn,VertexOut: ClipPos> Gpu<VertexIn,VertexOut> {
         let edge13 = p3 - p1;
         let winding_order = edge12.cross(edge13);
         if winding_order.is_negative() {
+            //self.fill_triangle(p1, p2, p3, RED);
             return;
         }
 
@@ -281,7 +273,70 @@ impl<VertexIn,VertexOut: ClipPos> Gpu<VertexIn,VertexOut> {
         self.line(&p3, &p1, color);
     }
 
-    fn clip_triangle_on_plane(
+    pub fn draw_indexed(&mut self, vertex_buffer: &[VertexIn], index_buffer: &[u32]) {
+        let normals = &[
+            vec3!(0., 0., 1.),
+            vec3!(0., 1., 0.),
+            vec3!(0., -1., 0.),
+            vec3!(1., 0., 0.),
+            vec3!(-1., 0., 0.),
+        ];
+        let plane_p = &[
+            vec3!(0., 0., 0.),
+            vec3!(0., -1., 0.),
+            vec3!(0., 1., 0.),
+            vec3!(-1., 0., 0.),
+            vec3!(1., 0., 0.),
+        ];
+        for t in index_buffer.chunks_exact(3) {
+            let vert_size = vertex_buffer.len() as u32;
+            if t[0] >= vert_size || t[1] >= vert_size || t[2] >= vert_size {
+                return;
+            }
+            //println!("GPU::draw_indexed : drawing triangle {} {} {}",t[0],t[1],t[2]);
+
+            let p1 = &vertex_buffer[t[0] as usize];
+            let p2 = &vertex_buffer[t[1] as usize];
+            let p3 = &vertex_buffer[t[2] as usize];
+
+            let vertex_shader = self.vertex_shader;
+
+            let p1 = vertex_shader(p1, &mut self.binds);
+            let p2 = vertex_shader(p2, &mut self.binds);
+            let p3 = vertex_shader(p3, &mut self.binds);
+
+            let pos1 = p1.clip_pos();
+            let pos2 = p2.clip_pos();
+            let pos3 = p3.clip_pos();
+
+            let fragment_shader = self.fragment_shader;
+
+            let color1 = fragment_shader(&p1, &mut self.binds);
+            //let color2 = fragment_shader(&p2, &mut self.binds);
+            //let color3 = fragment_shader(&p3, &mut self.binds);
+
+            let mut triangles = vec![Triangle::new(pos1, pos2, pos3,color1)];
+
+            // Clip triangles to the screen
+            for i in 0..normals.len() {
+                let mut out: Vec<Triangle> = Vec::new();
+                for t in &triangles {
+                    out.append(&mut clip_triangle_on_plane(
+                        normals[i], plane_p[i], *t,
+                    ));
+                }
+                triangles = out;
+            }
+
+            for triangle in &triangles {
+                self.draw_triangle_clip(triangle[0], triangle[1], triangle[2], triangle.col);
+                // FOR WIREFRAME 
+                // self.draw_triangle_clip_wire(triangle[0], triangle[1], triangle[2], triangle.col);
+            }
+        }
+    }
+}
+fn clip_triangle_on_plane(
         plane_norm: Vec3,
         plane_p: Vec3,
         og_triangle: Triangle,
@@ -372,64 +427,14 @@ impl<VertexIn,VertexOut: ClipPos> Gpu<VertexIn,VertexOut> {
         }
     }
 
-    pub fn draw_indexed(&mut self, vertex_buffer: &[VertexIn], index_buffer: &[u32]) {
-        let normals = &[
-            vec3!(0., 0., 1.),
-            vec3!(0., 1., 0.),
-            vec3!(0., -1., 0.),
-            vec3!(1., 0., 0.),
-            vec3!(-1., 0., 0.),
-        ];
-        let plane_p = &[
-            vec3!(0., 0., 0.),
-            vec3!(0., -1., 0.),
-            vec3!(0., 1., 0.),
-            vec3!(-1., 0., 0.),
-            vec3!(1., 0., 0.),
-        ];
-        for t in index_buffer.chunks_exact(3) {
-            let vert_size = vertex_buffer.len() as u32;
-            if t[0] >= vert_size || t[1] >= vert_size || t[2] >= vert_size {
-                return;
-            }
-            let p1 = &vertex_buffer[t[0] as usize];
-            let p2 = &vertex_buffer[t[1] as usize];
-            let p3 = &vertex_buffer[t[2] as usize];
 
-            let vertex_shader = self.vertex_shader;
+fn line_plane_intersect(plnae_p: Vec3, plane_n: Vec3, start: Vec3, end: Vec3) -> Vec3 {
+    let line_d = end - start;
+    let plane_d = plane_n.dot(plnae_p);
 
-            let p1 = vertex_shader(p1, &mut self.binds);
-            let p2 = vertex_shader(p2, &mut self.binds);
-            let p3 = vertex_shader(p3, &mut self.binds);
+    let t = (plane_d - plane_n.dot(start)) / plane_n.dot(line_d);
 
-            let pos1 = p1.clip_pos();
-            let pos2 = p2.clip_pos();
-            let pos3 = p3.clip_pos();
-
-            let fragment_shader = self.fragment_shader;
-
-            let color1 = fragment_shader(&p1, &mut self.binds);
-            //let color2 = fragment_shader(&p2, &mut self.binds);
-            //let color3 = fragment_shader(&p3, &mut self.binds);
-
-            let mut triangles = vec![Triangle::new(pos1, pos2, pos3,color1)];
-
-            // Clip triangles to the screen
-            for i in 0..normals.len() {
-                let mut out: Vec<Triangle> = Vec::new();
-                for t in &triangles {
-                    out.append(&mut Self::clip_triangle_on_plane(
-                        normals[i], plane_p[i], *t,
-                    ));
-                }
-                triangles = out;
-            }
-
-            for triangle in &triangles {
-                self.draw_triangle_clip(triangle[0], triangle[1], triangle[2], triangle.col);
-                // FOR WIREFRAME 
-                // self.draw_triangle_clip_wire(triangle[0], triangle[1], triangle[2], triangle.col);
-            }
-        }
-    }
+    let intersect = start + line_d * t;
+    intersect
 }
+

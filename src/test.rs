@@ -1,13 +1,13 @@
 use crate::SurfaceConfig;
 use crate::RED;
 use crate::WHITE;
+use crate::BLUE;
 use crate::GREEN;
 use crate::MAGENTA;
 use minifb;
 use my_math::matrix::Matrix;
 
 use crate as my_gpu;
-use std::any::Any;
 
 struct Window {
     window: minifb::Window,
@@ -28,9 +28,6 @@ impl Window {
     }
     fn is_open(&self) -> bool {
         self.window.is_open()
-    }
-    fn update(&mut self) {
-        self.window.update()
     }
     fn display(&mut self) {
         let _ = self.window.update_with_buffer(
@@ -54,19 +51,6 @@ impl Framebuffer {
             height,
         }
     }
-}
-
-use my_math::vec::IVec2;
-
-fn is_in_triangle(p1: IVec2, p2: IVec2, p3: IVec2, point: IVec2) -> bool {
-    let cross_12 = (point.x - p1.x) * (p2.y - p1.y) - (point.y - p1.y) * (p2.x - p1.x);
-    let cross_23 = (point.x - p2.x) * (p3.y - p2.y) - (point.y - p2.y) * (p3.x - p2.x);
-    let cross_31 = (point.x - p3.x) * (p1.y - p3.y) - (point.y - p3.y) * (p1.x - p3.x);
-
-    let all_pos = cross_12.is_positive() && cross_23.is_positive() && cross_31.is_positive();
-    let all_neg = cross_12.is_negative() && cross_23.is_negative() && cross_31.is_negative();
-
-    all_pos ^ all_neg
 }
 
 use my_math::vec::Vec3;
@@ -96,60 +80,6 @@ impl Camera {
     fn back(&self) -> Vec3 {
         -1. * self.forward()
     }
-}
-
-
-fn gen_cube_mesh(pos:Vec3,color:u32) -> Vec<VertexIn> {
-    let verts = [
-            [pos.x+1.,pos.y+0.,pos.z+0.],
-            [pos.x+1.,pos.y+1.,pos.z+0.],
-            [pos.x+1.,pos.y+1.,pos.z+1.],
-            [pos.x+1.,pos.y+0.,pos.z+1.],
-
-            [pos.x+0.,pos.y+0.,pos.z+0.],
-            [pos.x+0.,pos.y+0.,pos.z+1.],
-            [pos.x+0.,pos.y+1.,pos.z+1.],
-            [pos.x+0.,pos.y+1.,pos.z+0.],
-
-            [pos.x+1.,pos.y+0.,pos.z+1.],
-            [pos.x+1.,pos.y+1.,pos.z+1.],
-            [pos.x+0.,pos.y+1.,pos.z+1.],
-            [pos.x+0.,pos.y+0.,pos.z+1.],
-
-            [pos.x+1.,pos.y+0.,pos.z+0.],
-            [pos.x+0.,pos.y+0.,pos.z+0.],
-            [pos.x+0.,pos.y+1.,pos.z+0.],
-            [pos.x+1.,pos.y+1.,pos.z+0.],
-
-            [pos.x+0.,pos.y+1.,pos.z+0.],
-            [pos.x+0.,pos.y+1.,pos.z+1.],
-            [pos.x+1.,pos.y+1.,pos.z+1.],
-            [pos.x+1.,pos.y+1.,pos.z+0.],
-
-            [pos.x+0.,pos.y+0.,pos.z+0.],
-            [pos.x+1.,pos.y+0.,pos.z+0.],
-            [pos.x+1.,pos.y+0.,pos.z+1.],
-            [pos.x+0.,pos.y+0.,pos.z+1.],
-    ];
-    let normals = [
-            [ 1.,0.,0. ],
-            [ -1.,0.,0. ],
-            [ 0.,0.,1. ],
-            [ 0.,0.,-1. ],
-            [ 0.,1.,0. ],
-            [ 0.,-1.,0. ],
-            ];
-    let mut out = Vec::new();
-    for (i,quad) in verts.chunks_exact(4).enumerate() {
-        for j in 0..4 {
-            out.push(VertexIn {
-                pos: Vec3::from_slice(&quad[j]),
-                color: color,
-                norm: Vec3::from_slice(&normals[i]),
-            })
-        }
-    }
-    out
 }
 
 use self::my_gpu::Binds;
@@ -200,25 +130,6 @@ fn fragment(vert:&VertexOut, binds: &mut Binds) -> u32 {
     out
 }
 
-    
-pub fn gen_cube_indeces(vert_len: usize) -> Vec<u32> {
-    let mut indices: Vec<u32> = Vec::new();
-    indices.reserve_exact(vert_len * 10 / 4);
-    //clockwise winding
-    for i in 0..(vert_len as u32) / 4 {
-        indices.extend([
-            0 + 4 * i,
-            1 + 4 * i,
-            2 + 4 * i,
-            2 + 4 * i,
-            3 + 4 * i,
-            0 + 4 * i,
-        ]);
-    }
-    indices
-}
-
-
 #[test]
 fn main() {
     let mut window = Window::new("minifb", 600 * 16 / 9, 600);
@@ -247,21 +158,12 @@ fn main() {
     let mut light_dir = vec3!(-5.,-2.,-4.);
 
     let mut binds: Binds = Binds(Vec::new());
-
     binds.push(&mut view_proj);
     binds.push(&mut light_dir);
 
-    let mut verts = gen_cube_mesh(vec3!(0.,0.,0.),WHITE);
-    let mut verts_sun = gen_cube_mesh(light_dir,MAGENTA);
-    let mut verts_green= gen_cube_mesh(vec3!(light_dir.x * -1.,light_dir.y * -1.,light_dir.z),GREEN);
-    let mut indices = gen_cube_indeces(verts.len());
-    let mut indices_sun = gen_cube_indeces(verts_sun.len() + verts.len());
-    let mut indices_green = gen_cube_indeces(verts_green.len() + verts_sun.len() + verts.len());
-
-    verts.append(&mut verts_sun);
-    verts.append(&mut verts_green);
-    indices.append(&mut indices_sun);
-    indices.append(&mut indices_green);
+    let cube1_mesh = Mesh::from_obj("./teapot2.obj".to_string(),MAGENTA,vec3!(1.,1.,1.));
+    let cube2_mesh = Mesh::from_obj("./cube2.obj".to_string(),GREEN,vec3!(-1.,-1.,-1.));
+    let mut cube_sun_mesh = Mesh::from_obj("./cube2.obj".to_string(),WHITE,light_dir);
 
     let mut gpu = my_gpu::Gpu::new(
         config,
@@ -272,8 +174,10 @@ fn main() {
     );
 
     'draw_loop: while window.is_open() {
-        gpu.clear(my_gpu::BLUE);
-        gpu.draw_indexed(&verts,&indices);
+        gpu.clear(my_gpu::BLACK);
+        gpu.draw_indexed(&cube1_mesh.verts,&cube1_mesh.indices);
+        gpu.draw_indexed(&cube2_mesh.verts,&cube2_mesh.indices);
+        gpu.draw_indexed(&cube_sun_mesh.verts,&cube_sun_mesh.indices);
 
         for key in window.window.get_keys() {
             use minifb::Key;
@@ -339,20 +243,138 @@ fn main() {
             cam_trans_mat = my_math::matrix::look_at_lh(camera.pos, camera.pos + camera.dir, camera.up);
             proj = my_math::matrix::proj_mat_wgpu(camera.fov, 16. / 9., camera.near, camera.far);
             view_proj = proj * cam_trans_mat;
-
-            verts = gen_cube_mesh(vec3!(0.,0.,0.),WHITE);
-            verts_sun = gen_cube_mesh(light_dir,MAGENTA);
-            verts_green= gen_cube_mesh(vec3!(light_dir.x * -1.,light_dir.y * -1.,light_dir.z),GREEN);
-            indices = gen_cube_indeces(verts.len());
-            indices_sun = gen_cube_indeces(verts_sun.len() + verts.len());
-            indices_green = gen_cube_indeces(verts_green.len() + verts_sun.len() + verts.len());
-
-            verts.append(&mut verts_sun);
-            verts.append(&mut verts_green);
-            indices.append(&mut indices_sun);
-            indices.append(&mut indices_green);
+            cube_sun_mesh = Mesh::from_obj("./cube2.obj".to_string(),WHITE,light_dir); 
         }
 
         window.display();
     }
+}
+
+use std::fs::File;
+use std::io::{BufReader,BufRead};
+pub struct Mesh {
+    verts: Vec<VertexIn>,
+    indices: Vec<u32>,
+}
+impl Mesh {
+    pub fn from_obj(path: String, color:u32,pos:Vec3) -> Mesh {
+        let file = File::open(path).unwrap();  
+        
+        let reader = BufReader::new(file);
+
+        let mut out_verts: Vec<VertexIn> = Vec::new();
+        let mut out_indeces: Vec<u32> = Vec::new();
+
+        let mut verts: Vec<Vec3> = Vec::new();
+        let mut normals: Vec<Vec3> = Vec::new();
+
+        for (line_num,line) in reader.lines().enumerate() {
+            //print!("line {} ",line_num);
+            let line = line.unwrap_or("".to_string());
+            let line = line.trim();
+            
+            let tokens:Vec<&str> = line.split_whitespace().collect();
+            if tokens.is_empty() {
+                //println!("empty");
+                continue;
+            }
+            match tokens[0] {
+                "v" => {
+                    //println!("vert");
+                    let x:f64 = tokens[1].to_string().parse().expect("couldnt parse x of vert");
+                    let y:f64 = tokens[2].to_string().parse().expect("couldnt parse y of vert");
+                    let z:f64 = tokens[3].to_string().parse().expect("couldnt parse z of vert");
+                    verts.push(vec3!(x,y,z)+pos);
+                }
+                "vn" => {
+                    //println!("vert normal");
+                    let x:f64 = tokens[1].to_string().parse().expect("couldnt parse x of normal");
+                    let y:f64 = tokens[2].to_string().parse().expect("couldnt parse y of normal");
+                    let z:f64 = tokens[3].to_string().parse().expect("couldnt parse z of normal");
+                    normals.push(vec3!(x,y,z));
+                }
+                "f" => {
+                    //print!("face: ");
+                    if tokens.len() == 4 {
+                        //println!("triangle");
+                        let idx_count = out_indeces.len() as u32;
+                        out_indeces.append(&mut vec![0,1,2].iter().map(|i| idx_count + i).collect());
+                        
+                        let mut t_verts = Vec::new();
+                        for i in 1..4 {
+                            let indexes:Vec<&str> = tokens[i].split("/").collect();
+                            let v_index:usize = indexes[0].parse().unwrap();
+                            let v = verts[v_index -1];
+                            t_verts.push(v);
+                        }
+
+                        let mut t_norms = Vec::new();
+
+                        let indexes:Vec<&str> = tokens[1].split("/").collect();
+                        let has_norms = indexes.get(2).is_some();
+
+                        if has_norms {
+                            for i in 1..4 {
+                                let indexes:Vec<&str> = tokens[i].split("/").collect();
+                                let n_index:usize = indexes[2].parse().unwrap();
+                                let n = normals[n_index -1];
+                                t_norms.push(n);
+                            }
+                        } else {
+                            let norm = calculate_normals(t_verts[0],t_verts[1],t_verts[2]);
+                            for i in 1..4 {
+                                t_norms.push(norm);
+                            }
+                        }
+                        out_verts.push(VertexIn {
+                            pos: t_verts[0],
+                            color: color,
+                            norm: t_norms[0],
+                        });
+                        out_verts.push(VertexIn {
+                            pos: t_verts[1],
+                            color: color,
+                            norm: t_norms[1],
+                        });
+                        out_verts.push(VertexIn {
+                            pos: t_verts[2],
+                            color: color,
+                            norm: t_norms[2],
+                        });
+                    } else if tokens.len() > 4 {
+                        //Triangle 1: Vertices 1, 2, 3
+                        //Triangle 2: Vertices 1, 3, 4
+                        //println!("quad");
+                        let vert_count = out_verts.len() as u32;
+                        out_indeces.append(&mut vec![0,1,2,0,2,3].iter().map(|i| vert_count + i).collect());
+
+                        for i in 1..5 {
+                            let indexes:Vec<&str> = tokens[i].split("/").collect();
+                            let v_index:usize = indexes[0].parse().unwrap();
+                            let n_index:usize = indexes[2].parse().unwrap();
+                            let v = verts[v_index -1];
+                            let n = normals[n_index -1];
+                            let vertex = VertexIn {
+                                pos: v,
+                                color: color,
+                                norm: n,
+                            };
+                            out_verts.push(vertex);
+                        }
+                    }
+                }
+                _ => (),
+            }
+        }
+        Mesh {
+            verts: out_verts,
+            indices: out_indeces,
+        }
+    }
+}
+fn calculate_normals(p1:Vec3,p2:Vec3,p3:Vec3) -> Vec3 {
+    let edge12 = p2 - p1;
+    let edge13 = p3 - p1;
+    let norm = edge12.cross(edge13).norm();
+    norm
 }
