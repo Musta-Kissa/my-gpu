@@ -162,7 +162,7 @@ fn main() {
     binds.push(&mut light_dir);
 
     let cube1_mesh = Mesh::from_obj("./teapot2.obj".to_string(),MAGENTA,vec3!(1.,1.,1.));
-    let cube2_mesh = Mesh::from_obj("./cube2.obj".to_string(),GREEN,vec3!(-1.,-1.,-1.));
+    let cube2_mesh = Mesh::from_obj("./cube2.obj".to_string(),GREEN,vec3!(-5.,-2.,-3.));
     let mut cube_sun_mesh = Mesh::from_obj("./cube2.obj".to_string(),WHITE,light_dir);
 
     let mut gpu = my_gpu::Gpu::new(
