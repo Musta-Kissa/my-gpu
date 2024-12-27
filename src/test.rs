@@ -172,12 +172,30 @@ fn main() {
         vertex,
         fragment,
     );
+    let test_tri_vert = &[
+        VertexIn {
+            pos: vec3!(0.,0.,0.),
+            color: WHITE,
+            norm: Vec3::UP,
+        },
+        VertexIn {
+            pos: vec3!(0.,5.,10.),
+            color: RED,
+            norm: Vec3::UP,
+        },
+        VertexIn {
+            pos: vec3!(5.,0.,0.),
+            color: BLUE,
+            norm: Vec3::UP,
+        },
+    ];
 
     'draw_loop: while window.is_open() {
         gpu.clear(my_gpu::BLACK);
         gpu.draw_indexed(&cube1_mesh.verts,&cube1_mesh.indices);
         gpu.draw_indexed(&cube2_mesh.verts,&cube2_mesh.indices);
         gpu.draw_indexed(&cube_sun_mesh.verts,&cube_sun_mesh.indices);
+        gpu.draw_indexed(test_tri_vert,&vec![0,1,2]);
 
         for key in window.window.get_keys() {
             use minifb::Key;

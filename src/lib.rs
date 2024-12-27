@@ -207,10 +207,9 @@ impl<VertexIn, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
     }
     fn clip_to_v3(&self, pos: Vec4) -> Vec3 {
         let pos = pos / pos.w;
-        let s_x: i64 = ((pos.x + 1.) * self.config.surface_cofig.width as f64 / 2.).floor() as i64;
-        let s_y: i64 =
-            ((-pos.y + 1.) * self.config.surface_cofig.height as f64 / 2.).floor() as i64;
-        vec3!(s_x as f64, s_y as f64, pos.z)
+        let s_x = (pos.x + 1.) * self.config.surface_cofig.width as f64 / 2. ;
+        let s_y = (-pos.y + 1.) * self.config.surface_cofig.height as f64 / 2. ;
+        vec3!(s_x , s_y , pos.z)
     }
     fn clip_to_screen(&self, pos: Vec4) -> IVec2 {
         let pos = pos / pos.w;
@@ -233,9 +232,9 @@ impl<VertexIn, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
         let mut points = vec![p1, p2, p3];
         points.sort_by(|a, b| (a.y).total_cmp(&b.y));
 
-        let p1 = ivec2!(points[0].x as i64 ,points[0].y as i64);
-        let p2 = ivec2!(points[1].x as i64 ,points[1].y as i64);
-        let p3 = ivec2!(points[2].x as i64 ,points[2].y as i64);
+        let p1 = ivec2!(points[0].x.round() as i64 ,points[0].y.round() as i64);
+        let p2 = ivec2!(points[1].x.round() as i64 ,points[1].y.round() as i64);
+        let p3 = ivec2!(points[2].x.round() as i64 ,points[2].y.round() as i64);
 
 
         let z1 = points[0].z;
@@ -249,16 +248,18 @@ impl<VertexIn, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
             let slope13_z = (z1 - z3) / (p1.y - p3.y) as f64;
 
             for y in p1.y..=p3.y {
-                let mut x1 = (slope12 * (y - p2.y) as f64).round() as i64 + p2.x;
+                let mut x1 = (slope12 * (y - p2.y) as f64) + p2.x as f64;
                 let mut z1 = (slope12_z * (y - p2.y) as f64) + z2;
 
-                let mut x2 = (slope13 * (y - p3.y) as f64).round() as i64 + p3.x;
+                let mut x2 = (slope13 * (y - p3.y) as f64) + p3.x as f64;
                 let mut z2 = (slope13_z * (y - p3.y) as f64) + z3;
 
                 if x1 > x2 {
                     std::mem::swap(&mut x1, &mut x2);
                     std::mem::swap(&mut z1, &mut z2);
                 }
+                let x1 = x1.round() as i64;
+                let x2 = x2.round() as i64;
 
                 let slope_z12 = (z1 - z2) / (x1 - x2) as f64;
 
@@ -274,16 +275,18 @@ impl<VertexIn, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
             let slope23_z = (z2 - z3) / (p1.y - p3.y) as f64;
 
             for y in p1.y..=p3.y {
-                let mut x1 = (slope13 * (y - p3.y) as f64).round() as i64 + p3.x;
+                let mut x1 = (slope13 * (y - p3.y) as f64) + p3.x as f64;
                 let mut z1 = (slope13_z * (y - p3.y) as f64) + z3;
 
-                let mut x2 = (slope23 * (y - p2.y) as f64).round() as i64 + p2.x;
+                let mut x2 = (slope23 * (y - p2.y) as f64) + p2.x as f64;
                 let mut z2 = (slope23_z * (y - p2.y) as f64) + z2;
 
                 if x1 > x2 {
                     std::mem::swap(&mut x1, &mut x2);
                     std::mem::swap(&mut z1, &mut z2);
                 }
+                let x1 = x1.round() as i64;
+                let x2 = x2.round() as i64;
 
                 let slope_z12 = (z1 - z2) / (x1 - x2) as f64;
 
@@ -296,7 +299,7 @@ impl<VertexIn, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
             let slope = (p1.x - p3.x) as f64 / (p1.y - p3.y) as f64;
             let slope13_z = (z1 - z3) / (p1.y - p3.y) as f64;
             let d_y = p2.y;
-            let d_x = (slope * (p2.y - p3.y) as f64).ceil() as i64 + p3.x;
+            let d_x = (slope * (p2.y - p3.y) as f64) as i64 + p3.x;
             let d_z = (slope13_z * (p2.y - p3.y) as f64) + z3;
 
             let d = vec3!(d_x as f64, d_y as f64,d_z);
