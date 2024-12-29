@@ -232,6 +232,10 @@ impl<VertexIn, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
         let mut points = vec![p1, p2, p3];
         points.sort_by(|a, b| (a.y).total_cmp(&b.y));
 
+        let p1_o = points[0];
+        let p2_o = points[1];
+        let p3_o = points[2];
+
         let p1 = ivec2!(points[0].x.round() as i64 ,points[0].y.round() as i64);
         let p2 = ivec2!(points[1].x.round() as i64 ,points[1].y.round() as i64);
         let p3 = ivec2!(points[2].x.round() as i64 ,points[2].y.round() as i64);
@@ -243,25 +247,27 @@ impl<VertexIn, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
 
         if p2.y == p3.y {
             let slope12 = (p1.x - p2.x) as f64 / (p1.y - p2.y) as f64;
-            let slope12_z = (z1 - z2) / (p1.y - p2.y) as f64;
+            let slope12_z = (z1 - z2) / (p1_o.y - p2_o.y);
             let slope13 = (p1.x - p3.x) as f64 / (p1.y - p3.y) as f64;
-            let slope13_z = (z1 - z3) / (p1.y - p3.y) as f64;
+            let slope13_z = (z1 - z3) / (p1_o.y - p3_o.y) as f64;
 
             for y in p1.y..=p3.y {
                 let mut x1 = (slope12 * (y - p2.y) as f64) + p2.x as f64;
-                let mut z1 = (slope12_z * (y - p2.y) as f64) + z2;
+                let mut z1 = (slope12_z * (y as f64 - p2_o.y) as f64) + z2;
 
                 let mut x2 = (slope13 * (y - p3.y) as f64) + p3.x as f64;
-                let mut z2 = (slope13_z * (y - p3.y) as f64) + z3;
+                let mut z2 = (slope13_z * (y as f64 - p3_o.y) as f64) + z3;
 
                 if x1 > x2 {
                     std::mem::swap(&mut x1, &mut x2);
                     std::mem::swap(&mut z1, &mut z2);
                 }
+                let x1_o = x1;
+                let x2_o = x2;
                 let x1 = x1.round() as i64;
                 let x2 = x2.round() as i64;
 
-                let slope_z12 = (z1 - z2) / (x1 - x2) as f64;
+                let slope_z12 = (z1 - z2) / (x1_o - x2_o) as f64;
 
                 for x in x1..=x2 {
                     let z = (slope_z12 * (x - x2) as f64) + z2;
@@ -270,25 +276,27 @@ impl<VertexIn, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
             }
         } else if p1.y == p2.y {
             let slope13 = (p1.x - p3.x) as f64 / (p1.y - p3.y) as f64;
-            let slope13_z = (z1 - z3) / (p1.y - p3.y) as f64;
+            let slope13_z = (z1 - z3) / (p1_o.y - p3_o.y) as f64;
             let slope23 = (p2.x - p3.x) as f64 / (p2.y - p3.y) as f64;
-            let slope23_z = (z2 - z3) / (p1.y - p3.y) as f64;
+            let slope23_z = (z2 - z3) / (p1_o.y - p3_o.y) as f64;
 
             for y in p1.y..=p3.y {
                 let mut x1 = (slope13 * (y - p3.y) as f64) + p3.x as f64;
-                let mut z1 = (slope13_z * (y - p3.y) as f64) + z3;
+                let mut z1 = (slope13_z * (y as f64 - p3_o.y) as f64) + z3;
 
                 let mut x2 = (slope23 * (y - p2.y) as f64) + p2.x as f64;
-                let mut z2 = (slope23_z * (y - p2.y) as f64) + z2;
+                let mut z2 = (slope23_z * (y as f64 - p2_o.y) as f64) + z2;
 
                 if x1 > x2 {
                     std::mem::swap(&mut x1, &mut x2);
                     std::mem::swap(&mut z1, &mut z2);
                 }
+                let x1_o = x1;
+                let x2_o = x2;
                 let x1 = x1.round() as i64;
                 let x2 = x2.round() as i64;
 
-                let slope_z12 = (z1 - z2) / (x1 - x2) as f64;
+                let slope_z12 = (z1 - z2) / (x1_o - x2_o) as f64;
 
                 for x in x1..=x2 {
                     let z = (slope_z12 * (x - x2) as f64) + z2;
@@ -297,10 +305,10 @@ impl<VertexIn, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
             }
         } else {
             let slope = (p1.x - p3.x) as f64 / (p1.y - p3.y) as f64;
-            let slope13_z = (z1 - z3) / (p1.y - p3.y) as f64;
+            let slope13_z = (z1 - z3) / (p1_o.y - p3_o.y) as f64;
             let d_y = p2.y;
             let d_x = (slope * (p2.y - p3.y) as f64) as i64 + p3.x;
-            let d_z = (slope13_z * (p2.y - p3.y) as f64) + z3;
+            let d_z = (slope13_z * (p2_o.y - p3_o.y) as f64) + z3;
 
             let d = vec3!(d_x as f64, d_y as f64,d_z);
             self.fill_triangle_z(points[0], points[1], d, color);
@@ -366,7 +374,7 @@ impl<VertexIn, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
         let edge13 = p3 - p1;
         let winding_order = edge12.cross(edge13);
         if winding_order.z.is_sign_negative() {
-            //self.fill_triangle(p1, p2, p3, RED);
+            //self.fill_triangle_z(p1, p2, p3, RED);
             return;
         }
 
@@ -460,7 +468,7 @@ impl<VertexIn, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
             for triangle in &triangles {
                 self.draw_triangle_clip_z(triangle[0], triangle[1], triangle[2], triangle.col);
                 // FOR WIREFRAME
-                // self.draw_triangle_clip_wire(triangle[0], triangle[1], triangle[2], triangle.col);
+                //self.draw_triangle_clip_wire(triangle[0], triangle[1], triangle[2], RED);
             }
         }
     }
@@ -479,7 +487,6 @@ fn clip_triangle_on_plane(plane_norm: Vec3, plane_p: Vec3, og_triangle: Triangle
         let dot_point = plane_norm.dot(plane_to_point);
 
         if dot_point < 0. {
-            //if og_triangle[i].z < 0. {
             outside_index_list.push(i);
         } else {
             inside_index_list.push(i);

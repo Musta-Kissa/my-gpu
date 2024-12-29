@@ -6,6 +6,7 @@ use crate::GREEN;
 use crate::MAGENTA;
 use minifb;
 use my_math::matrix::Matrix;
+use std::time::Instant;
 
 use crate as my_gpu;
 
@@ -115,12 +116,12 @@ fn vertex(vert:&VertexIn , binds: &mut Binds) -> VertexOut {
 fn fragment(vert:&VertexOut, binds: &mut Binds) -> u32 {
     let light_dir:Vec3 = *binds.cast_ref(1).unwrap();
 
-    let ambient = 0b0000_0100;
+    let ambient = 0b0000_0111;
 
     let dot_light = light_dir.norm().dot(vert.norm);
     let dim_ratio = (dot_light + 1.)/2.;
 
-    let r_col = (( (vert.color << 8) >> 24) as f64 * dim_ratio).round() as u32 | ambient;
+    let r_col = (( (vert.color << 08) >> 24) as f64 * dim_ratio).round() as u32 | ambient;
     let g_col = (( (vert.color << 16) >> 24) as f64 * dim_ratio).round() as u32 | ambient;
     let b_col = (( (vert.color << 24) >> 24) as f64 * dim_ratio).round() as u32 | ambient;
     let mut out = 0u32;
@@ -161,9 +162,9 @@ fn main() {
     binds.push(&mut view_proj);
     binds.push(&mut light_dir);
 
-    let cube1_mesh = Mesh::from_obj("./teapot2.obj".to_string(),MAGENTA,vec3!(1.,1.,1.));
-    let cube2_mesh = Mesh::from_obj("./cube2.obj".to_string(),GREEN,vec3!(-5.,-2.,-3.));
-    let mut cube_sun_mesh = Mesh::from_obj("./cube2.obj".to_string(),WHITE,light_dir);
+    let cube1_mesh = Mesh::from_obj("./teapot2.obj".into(),MAGENTA,vec3!(1.,1.,1.));
+    let cube2_mesh = Mesh::from_obj("./cube2.obj".into(),GREEN,vec3!(-5.,-2.,-3.));
+    let mut cube_sun_mesh = Mesh::from_obj("./cube2.obj".into(),WHITE,light_dir);
 
     let mut gpu = my_gpu::Gpu::new(
         config,
@@ -191,6 +192,7 @@ fn main() {
     ];
 
     'draw_loop: while window.is_open() {
+        let start = Instant::now();
         gpu.clear(my_gpu::BLACK);
         gpu.draw_indexed(&cube1_mesh.verts,&cube1_mesh.indices);
         gpu.draw_indexed(&cube2_mesh.verts,&cube2_mesh.indices);
@@ -265,6 +267,8 @@ fn main() {
         }
 
         window.display();
+        let d_t = start.elapsed().as_millis() as f64;
+        println!("{:.2}fps ({}ms)",1./(d_t / 1000.),d_t);
     }
 }
 
