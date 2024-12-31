@@ -17,9 +17,9 @@ struct Window {
 impl Window {
     fn new(name: &str, width: usize, height: usize) -> Self {
         let mut window =
-            minifb::Window::new(name, width, height, minifb::WindowOptions::default()).unwrap();
+            minifb::Window::new(name, width, height, minifb::WindowOptions { resize: true , ..minifb::WindowOptions::default() } ).unwrap();
 
-        window.set_target_fps(60);
+        //window.set_target_fps(60);
 
         let framebuffer = Framebuffer::new(width, height);
         Self {
@@ -133,7 +133,7 @@ fn fragment(vert:&VertexOut, binds: &mut Binds) -> u32 {
 
 #[test]
 fn main() {
-    let mut window = Window::new("minifb", 600 * 16 / 9, 600);
+    let mut window = Window::new("minifb", 200 * 16 / 9, 200);
     let surface_config = SurfaceConfig {
         width: window.framebuffer.width,
         height: window.framebuffer.height,
@@ -143,7 +143,7 @@ fn main() {
         up: vec3!(0., 1., 0.),
         pos: vec3!(0., 0., -1.),
         dir: vec3!(0., 0., 1.),
-        speed: 0.05,
+        speed: 0.005,
         near: 0.1,
         far: 100.,
         fov: 60.,
@@ -163,6 +163,8 @@ fn main() {
     binds.push(&mut light_dir);
 
     let cube1_mesh = Mesh::from_obj("./teapot2.obj".into(),MAGENTA,vec3!(1.,1.,1.));
+    let cube3_mesh = Mesh::from_obj("./teapot2.obj".into(),MAGENTA,vec3!(3.,2.,1.));
+    let cube4_mesh = Mesh::from_obj("./teapot2.obj".into(),MAGENTA,vec3!(1.,2.,-4.));
     let cube2_mesh = Mesh::from_obj("./cube2.obj".into(),GREEN,vec3!(-5.,-2.,-3.));
     let mut cube_sun_mesh = Mesh::from_obj("./cube2.obj".into(),WHITE,light_dir);
 
@@ -193,23 +195,31 @@ fn main() {
 
     'draw_loop: while window.is_open() {
         let start = Instant::now();
+
         gpu.clear(my_gpu::BLACK);
         gpu.draw_indexed(&cube1_mesh.verts,&cube1_mesh.indices);
         gpu.draw_indexed(&cube2_mesh.verts,&cube2_mesh.indices);
+        gpu.draw_indexed(&cube3_mesh.verts,&cube3_mesh.indices);
+        gpu.draw_indexed(&cube4_mesh.verts,&cube4_mesh.indices);
         gpu.draw_indexed(&cube_sun_mesh.verts,&cube_sun_mesh.indices);
         gpu.draw_indexed(test_tri_vert,&vec![0,1,2]);
+
+        window.display();
+
+        let d_t = start.elapsed().as_millis() as f64;
+        println!("{:.2}fps ({}ms)",1./(d_t / 1000.),d_t);
 
         for key in window.window.get_keys() {
             use minifb::Key;
             match key {
-                Key::Space => camera.pos = camera.pos + camera.speed * camera.up, // Up
-                Key::LeftShift => camera.pos = camera.pos - camera.speed * camera.up, // Down
+                Key::Space => camera.pos = camera.pos + camera.speed  * d_t * camera.up, // Up
+                Key::LeftShift => camera.pos = camera.pos - camera.speed * d_t * camera.up, // Down
 
-                Key::W => camera.pos = camera.pos + camera.speed * camera.forward(),
-                Key::S => camera.pos = camera.pos + camera.speed * camera.back(),
+                Key::W => camera.pos = camera.pos + camera.speed * d_t * camera.forward(),
+                Key::S => camera.pos = camera.pos + camera.speed * d_t * camera.back(),
 
-                Key::D => camera.pos = camera.pos + camera.speed * camera.right(),
-                Key::A => camera.pos = camera.pos + camera.speed * camera.left(),
+                Key::D => camera.pos = camera.pos + camera.speed * d_t * camera.right(),
+                Key::A => camera.pos = camera.pos + camera.speed * d_t * camera.left(),
 
                 Key::K => {
                     camera.speed = camera.speed * 1.05;
@@ -235,17 +245,17 @@ fn main() {
 
                 Key::Escape => break 'draw_loop,
 
-                Key::Left => camera.dir.rot_quat(-1., camera.up), //Yaw Left
-                Key::Right => camera.dir.rot_quat(1., camera.up), //Yaw Right
-                Key::E => camera.up.rot_quat(-1., camera.dir),    //Roll Right
-                Key::Q => camera.up.rot_quat(1., camera.dir),     //Roll Left
+                Key::Left => camera.dir.rot_quat(-1. * d_t / 16., camera.up), //Yaw Left
+                Key::Right => camera.dir.rot_quat(1. * d_t / 16., camera.up), //Yaw Right
+                Key::E => camera.up.rot_quat(-1. * d_t / 16., camera.dir),    //Roll Right
+                Key::Q => camera.up.rot_quat(1. * d_t / 16., camera.dir),     //Roll Left
                 Key::Up => {
                     // clamp the angle
                     if camera.dir.dot(camera.up) > 0.9 {
                         continue;
                     }
                     //Pitch Up
-                    camera.dir.rot_quat(1., camera.dir.cross(camera.up).norm());
+                    camera.dir.rot_quat(1. * d_t / 16., camera.dir.cross(camera.up).norm());
                 }
                 Key::Down => {
                     // clamp the angle
@@ -253,7 +263,7 @@ fn main() {
                         continue;
                     }
                     //Pitch Down
-                    camera.dir.rot_quat(-1., camera.dir.cross(camera.up).norm());
+                    camera.dir.rot_quat(-1. * d_t / 16., camera.dir.cross(camera.up).norm());
                 }
 
                 _ => (),
@@ -266,9 +276,7 @@ fn main() {
             cube_sun_mesh = Mesh::from_obj("./cube2.obj".to_string(),WHITE,light_dir); 
         }
 
-        window.display();
-        let d_t = start.elapsed().as_millis() as f64;
-        println!("{:.2}fps ({}ms)",1./(d_t / 1000.),d_t);
+
     }
 }
 
