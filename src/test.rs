@@ -141,8 +141,8 @@ fn main() {
 
     let mut camera = Camera {
         up: vec3!(0., 1., 0.),
-        pos: vec3!(0., 0., -1.),
-        dir: vec3!(0., 0., 1.),
+        pos: vec3!(5.2256, 3., -4.4260),
+        dir: vec3!(-0.5317, -0.2334, 0.84688),
         speed: 0.005,
         near: 0.1,
         far: 100.,
@@ -182,7 +182,7 @@ fn main() {
             norm: Vec3::UP,
         },
         VertexIn {
-            pos: vec3!(0.,5.,10.),
+            pos: vec3!(0.,5.,0.),
             color: RED,
             norm: Vec3::UP,
         },
@@ -207,7 +207,7 @@ fn main() {
         window.display();
 
         let d_t = start.elapsed().as_millis() as f64;
-        println!("{:.2}fps ({}ms)",1./(d_t / 1000.),d_t);
+        window.window.set_title(&format!("{:.2}fps ({}ms)",1./(d_t / 1000.),d_t));
 
         for key in window.window.get_keys() {
             use minifb::Key;
@@ -233,8 +233,9 @@ fn main() {
                 Key::O => camera.fov += 1.,
                 Key::P => camera.fov -= 1.,
 
-                Key::G => {
+                Key::C => {
                     println!("camera pos:{:?}", camera.pos);
+                    println!("camera dir:{:?}", camera.dir);
                 }
                 Key::H => {
                     light_dir.rot_quat(1.,vec3!(-1.,0.,1.));
