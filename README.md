@@ -1,3 +1,5 @@
+** This is a WIP project**
+
 ### Description 
 This is a simple  software implementation of a GPU.
 You have to provide it a Vertex and an Index buffer and write a vertex and fragment shader for it. 
