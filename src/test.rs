@@ -133,7 +133,7 @@ fn fragment(vert:&VertexOut, binds: &mut Binds) -> u32 {
 
 #[test]
 fn main() {
-    let mut window = Window::new("minifb", 200 * 16 / 9, 200);
+    let mut window = Window::new("minifb", 600 * 16 / 9, 600);
     let surface_config = SurfaceConfig {
         width: window.framebuffer.width,
         height: window.framebuffer.height,
@@ -202,7 +202,7 @@ fn main() {
         //gpu.draw_indexed(&cube3_mesh.verts,&cube3_mesh.indices);
         //gpu.draw_indexed(&cube4_mesh.verts,&cube4_mesh.indices);
         gpu.draw_indexed(&cube_sun_mesh.verts,&cube_sun_mesh.indices);
-        gpu.draw_indexed(test_tri_vert,&vec![0,1,2]);
+        //gpu.draw_indexed(test_tri_vert,&vec![0,1,2]);
 
         window.display();
 

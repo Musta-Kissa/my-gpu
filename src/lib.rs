@@ -483,7 +483,8 @@ impl<VertexIn, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
             return;
         }
 
-        self.fill_triangle_z_f(p1, p2, p3, color);
+        //self.fill_triangle_z_f(p1, p2, p3, color);
+        self.fill_triangle_z(p1, p2, p3, color);
     }
     fn draw_triangle_clip(&mut self, p1: Vec4, p2: Vec4, p3: Vec4, color: u32) {
         let p1 = self.clip_to_screen(p1);

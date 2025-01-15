@@ -1,5 +1,14 @@
-![Screenshot](./screenshots/screenshot1.png)
+### Description 
+This is a simple  software implementation of a GPU.
+You have to provide it a Vertex and an Index buffer and write a vertex and fragment shader for it. 
+
+### Implementation Details 
+The GPU implements near plane and screen edge clipping to improve performance. It also implements a Z or a Depth buffer.
+
+It uses my own math library for the vector and matrix math. The only dependency that's not mine is minifb which handles the opening of the window and renders a pixel buffer to the screen.
+
+### Screenshots
+![Screenshot](./screenshots/teapot.png)
 ![Screenshot](./screenshots/color_cubes.png)
 ![Screenshot](./screenshots/no_clear.png)
-![Screenshot](./screenshots/bug1.png)
-![Screenshot](./screenshots/IMG_20250114_120102.jpg)
+![Screenshot](./screenshots/screenshot1.png)
