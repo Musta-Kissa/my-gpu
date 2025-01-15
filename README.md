@@ -4,6 +4,12 @@
 This is a simple  software implementation of a GPU.
 You have to provide it a Vertex and an Index buffer and write a vertex and fragment shader for it. 
 
+### How to run
+#### Dependencies
+You have to have `my-math` repo from my github in the same directory as `my-gpu`.
+Then simply run:
+``` cargo test --realease ```
+
 ### Implementation Details 
 The GPU implements near plane and screen edge clipping to improve performance. It also implements a Z or a Depth buffer.
 
