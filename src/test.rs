@@ -1,9 +1,14 @@
 use crate::SurfaceConfig;
+use crate::VertexPos;
+use crate::ALPHA_HALF;
+use crate::LIGHT_BLUE;
 use crate::RED;
+use crate::RED_TRANSPARENT;
 use crate::WHITE;
 use crate::BLUE;
 use crate::GREEN;
 use crate::MAGENTA;
+use crate::YELLOW;
 use minifb;
 use my_math::matrix::Matrix;
 use std::time::Instant;
@@ -101,6 +106,11 @@ impl ClipPos for VertexOut {
         self.clip_pos
     }
 }
+impl VertexPos for VertexIn {
+    fn vertex_pos(&self) -> Vec3 {
+        self.pos
+    }
+}
 
 fn vertex(vert:&VertexIn , binds: &mut Binds) -> VertexOut {
     let bind0: Matrix<4,4> = *binds.cast_ref(0).unwrap();
@@ -128,12 +138,14 @@ fn fragment(vert:&VertexOut, binds: &mut Binds) -> u32 {
     out = out | (r_col << 16);
     out = out | (g_col << 8);
     out = out | (b_col << 0);
+    out = out | (vert.color >> 24) << 24;
     out
 }
 
+const RES: usize = 600;
 #[test]
 fn main() {
-    let mut window = Window::new("minifb", 600 * 16 / 9, 600);
+    let mut window = Window::new("minifb", RES * 16 / 9, RES);
     let surface_config = SurfaceConfig {
         width: window.framebuffer.width,
         height: window.framebuffer.height,
@@ -141,8 +153,8 @@ fn main() {
 
     let mut camera = Camera {
         up: vec3!(0., 1., 0.),
-        pos: vec3!(5.2256, 3., -4.4260),
-        dir: vec3!(-0.5317, -0.2334, 0.84688),
+        pos: Vec3 { x: 5.779785901190033, y: 4.8049999999999935, z: -9.057020099801605 },
+        dir: Vec3 { x: -0.4866490490059816, y: -0.23339999999999939, z: 0.873546408327325 },
         speed: 0.005,
         near: 0.1,
         far: 100.,
@@ -162,10 +174,10 @@ fn main() {
     binds.push(&mut view_proj);
     binds.push(&mut light_dir);
 
-    let cube1_mesh = Mesh::from_obj("./teapot2.obj".into(),MAGENTA,vec3!(1.,1.,1.));
-    let cube3_mesh = Mesh::from_obj("./teapot2.obj".into(),MAGENTA,vec3!(3.,2.,1.));
-    let cube4_mesh = Mesh::from_obj("./teapot2.obj".into(),MAGENTA,vec3!(1.,2.,-4.));
-    let cube2_mesh = Mesh::from_obj("./cube2.obj".into(),GREEN,vec3!(-5.,-2.,-3.));
+    let teapot_mesh1 = Mesh::from_obj("./teapot2.obj".into(),RED_TRANSPARENT,vec3!(1.,1.,-6.));
+    let teapot_mesh2 = Mesh::from_obj("./teapot2.obj".into(),LIGHT_BLUE,vec3!(3.,2.,1.));
+    let teapot_mesh3 = Mesh::from_obj("./teapot2.obj".into(),YELLOW,vec3!(1.,2.,-4.));
+    let cube_mesh1 = Mesh::from_obj("./cube2.obj".into(),ALPHA_HALF | GREEN,vec3!(-5.,-2.,-3.));
     let mut cube_sun_mesh = Mesh::from_obj("./cube2.obj".into(),WHITE,light_dir);
 
     let mut gpu = my_gpu::Gpu::new(
@@ -196,14 +208,15 @@ fn main() {
     'draw_loop: while window.is_open() {
         let start = Instant::now();
 
-        gpu.clear(my_gpu::BLACK);
-        gpu.draw_indexed(&cube1_mesh.verts,&cube1_mesh.indices);
-        gpu.draw_indexed(&cube2_mesh.verts,&cube2_mesh.indices);
-        //gpu.draw_indexed(&cube3_mesh.verts,&cube3_mesh.indices);
-        //gpu.draw_indexed(&cube4_mesh.verts,&cube4_mesh.indices);
-        gpu.draw_indexed(&cube_sun_mesh.verts,&cube_sun_mesh.indices);
-        //gpu.draw_indexed(test_tri_vert,&vec![0,1,2]);
+        gpu.clear(my_gpu::LIGHT_BLUE);
+        gpu.draw_indexed(&cube_sun_mesh.verts,&cube_sun_mesh.indices,false);
+        
+        gpu.draw_indexed(&teapot_mesh2.verts,&teapot_mesh2.indices,false);
+        gpu.draw_indexed(&teapot_mesh3.verts,&teapot_mesh3.indices,false);
+        gpu.draw_indexed(test_tri_vert,&vec![0,1,2],false);
 
+        gpu.draw_indexed(&cube_mesh1.verts,&cube_mesh1.indices,true);
+        gpu.draw_indexed(&teapot_mesh1.verts,&teapot_mesh1.indices,true);
         window.display();
 
         let d_t = start.elapsed().as_millis() as f64;
@@ -266,7 +279,6 @@ fn main() {
                     //Pitch Down
                     camera.dir.rot_quat(-1. * d_t / 16., camera.dir.cross(camera.up).norm());
                 }
-
                 _ => (),
             }
         }
@@ -276,8 +288,6 @@ fn main() {
             view_proj = proj * cam_trans_mat;
             cube_sun_mesh = Mesh::from_obj("./cube2.obj".to_string(),WHITE,light_dir); 
         }
-
-
     }
 }
 
