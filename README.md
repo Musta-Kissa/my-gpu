@@ -15,6 +15,8 @@ The GPU implements near plane and screen edge clipping to improve performance. I
 It uses my own math library for the vector and matrix math. The only dependency that's not mine is minifb which handles the opening of the window and renders a pixel buffer to the screen.
 
 ### Screenshots
+![Screenshot](./screenshots/everything-all-at-once.png)
+![Screenshot](./screenshots/transparent.png)
 ![Screenshot](./screenshots/teapot.png)
 ![Screenshot](./screenshots/color_cubes.png)
 ![Screenshot](./screenshots/no_clear.png)
