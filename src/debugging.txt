@@ -1,0 +1,4 @@
+TODO:
+interpolate color when spliting / clipping triangle
+sort the colors when sorting the vertices by y
+check on geogebra if the interpolation of colors then clippling works

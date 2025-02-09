@@ -142,7 +142,7 @@ fn fragment(vert:&VertexOut, binds: &mut Binds) -> u32 {
     out
 }
 
-const RES: usize = 600;
+const RES: usize = 1080;
 #[test]
 fn main() {
     let mut window = Window::new("minifb", RES * 16 / 9, RES);
@@ -153,8 +153,10 @@ fn main() {
 
     let mut camera = Camera {
         up: vec3!(0., 1., 0.),
-        pos: Vec3 { x: 5.779785901190033, y: 4.8049999999999935, z: -9.057020099801605 },
-        dir: Vec3 { x: -0.4866490490059816, y: -0.23339999999999939, z: 0.873546408327325 },
+        //pos: Vec3 { x: 5.779785901190033, y: 4.8049999999999935, z: -9.057020099801605 },
+        //dir: Vec3 { x: -0.4866490490059816, y: -0.23339999999999939, z: 0.873546408327325 },
+        pos: vec3!(2.5,2.5,-5.),
+        dir: vec3!(0.,0.,1.),
         speed: 0.005,
         near: 0.1,
         far: 100.,
@@ -190,11 +192,11 @@ fn main() {
     let test_tri_vert = &[
         VertexIn {
             pos: vec3!(0.,0.,0.),
-            color: WHITE,
+            color: GREEN,
             norm: Vec3::UP,
         },
         VertexIn {
-            pos: vec3!(0.,5.,0.),
+            pos: vec3!(2.5,5.,0.),
             color: RED,
             norm: Vec3::UP,
         },
@@ -209,14 +211,14 @@ fn main() {
         let start = Instant::now();
 
         gpu.clear(my_gpu::LIGHT_BLUE);
-        gpu.draw_indexed(&cube_sun_mesh.verts,&cube_sun_mesh.indices,false);
-        
-        gpu.draw_indexed(&teapot_mesh2.verts,&teapot_mesh2.indices,false);
-        gpu.draw_indexed(&teapot_mesh3.verts,&teapot_mesh3.indices,false);
+        //gpu.draw_indexed(&cube_sun_mesh.verts,&cube_sun_mesh.indices,false);
+        //
+        //gpu.draw_indexed(&teapot_mesh2.verts,&teapot_mesh2.indices,false);
+        //gpu.draw_indexed(&teapot_mesh3.verts,&teapot_mesh3.indices,false);
         gpu.draw_indexed(test_tri_vert,&vec![0,1,2],false);
-
-        gpu.draw_indexed(&cube_mesh1.verts,&cube_mesh1.indices,true);
-        gpu.draw_indexed(&teapot_mesh1.verts,&teapot_mesh1.indices,true);
+//
+        //gpu.draw_indexed(&cube_mesh1.verts,&cube_mesh1.indices,true);
+        //gpu.draw_indexed(&teapot_mesh1.verts,&teapot_mesh1.indices,true);
         window.display();
 
         let d_t = start.elapsed().as_millis() as f64;
