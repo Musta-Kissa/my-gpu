@@ -80,6 +80,18 @@ impl Add<Color> for Color {
         }
     }
 }
+fn blend_color(c1:Color, c2: Color, ratio: f64) -> Color {
+    unsafe {
+        Color { ch: ColorChanels {
+            a: c1.ch.a,
+            r: (c1.ch.r as f64 * ratio + c2.ch.r as f64 * (1. - ratio)).round() as u8,
+            g: (c1.ch.g as f64 * ratio + c2.ch.g as f64 * (1. - ratio)).round() as u8,
+            b: (c1.ch.b as f64 * ratio + c2.ch.b as f64 * (1. - ratio)).round() as u8,
+        }}
+    }
+}
+
+
 
 #[derive(Clone, Copy)]
 struct TriangleV3 {
@@ -353,7 +365,7 @@ impl<VertexIn: VertexPos, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
             // |vec(p1 -> d)| / |vec(p1 -> p3)|
             let ratio = (vec3!(x,y,0.) - vec3!( p1.x, p1.y, 0.)).mag() / (vec3!(p3.x,p3.y,0.) - vec3!( p1.x, p1.y, 0.)).mag();
             // blend c1 and c3
-            let color_d = c3 * ratio + c1 * (1. - ratio);
+            let color_d = blend_color(c3, c1, ratio);
             self.fill_flat_bottom(p1, p2, d, c1, c2, color_d);
             self.fill_flat_top(d, p2, p3, color_d, c2, c3);
         }
@@ -398,6 +410,7 @@ impl<VertexIn: VertexPos, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
                                             g: (c1.ch.g as f64 * lambda1 + c2.ch.g as f64 * lambda2 + c3.ch.g as f64 * lambda3).floor() as u8,
                                             b: (c1.ch.b as f64 * lambda1 + c2.ch.b as f64 * lambda2 + c3.ch.b as f64 * lambda3).floor() as u8,
                                         }};
+                    //let z = p1.z * lambda1 + p2.z * lambda2 + p3.z * lambda3;
                     self.set_pixel_z(ivec2!(x, y), color, z);
                 }
                 z += zinc;
@@ -448,6 +461,7 @@ impl<VertexIn: VertexPos, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
                                             g: (c1.ch.g as f64 * lambda1 + c2.ch.g as f64 * lambda2 + c3.ch.g as f64 * lambda3).floor() as u8,
                                             b: (c1.ch.b as f64 * lambda1 + c2.ch.b as f64 * lambda2 + c3.ch.b as f64 * lambda3).floor() as u8,
                                         }};
+                    //let z = p1.z * lambda1 + p2.z * lambda2 + p3.z * lambda3;
                     self.set_pixel_z(ivec2!(x, y), color, z);
                 }
                 z += zinc;
