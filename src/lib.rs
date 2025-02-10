@@ -14,9 +14,15 @@ use std::ops::Mul;
 use std::ops::Add;
 
 use my_math::matrix::Matrix;
+use my_math::vec;
 use my_math::vec::IVec2;
+use my_math::vec::Vec2;
 use my_math::vec::Vec3;
 use my_math::vec::Vec4;
+
+use std::sync::Mutex;
+
+pub static DUMP: Mutex<u32> = Mutex::new(0);
 
 pub const ALPHA_FULL: u32 = 0b1111_1111 << 24;
 pub const ALPHA_HALF: u32 = 0b0111_1111 << 24;
@@ -48,13 +54,12 @@ impl Mul<f64> for Color {
     fn mul(self, rhs: f64) -> Self::Output {
         unsafe {
             let a = self.ch.a;
-            let r = (self.ch.r as f64 * rhs).round() as u8;
-            let g = (self.ch.g as f64 * rhs).round() as u8;
-            let b = (self.ch.b as f64 * rhs).round() as u8;
+            let r = (self.ch.r as f64 * rhs).floor() as u8;
+            let g = (self.ch.g as f64 * rhs).floor() as u8;
+            let b = (self.ch.b as f64 * rhs).floor() as u8;
             Color {
                 ch: ColorChanels {
-                    a,
-                    r,g,b
+                    a,r,g,b
                 }
             }
         }
@@ -81,6 +86,12 @@ struct TriangleV3 {
     vert: [Vec3; 3],
     col: [Color; 3],
 }
+// BETTER?
+//struct TestTri {
+    //vert: Vec3,
+    //col: Color
+//}
+//type Test = [TestTri;3];
 impl TriangleV3 {
     fn new(p1: Vec3, p2: Vec3, p3: Vec3, c1: Color, c2: Color, c3: Color) -> Self {
         TriangleV3 {
@@ -218,7 +229,7 @@ impl<VertexIn: VertexPos, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
         }
         self.zbuffer[pos.y as usize * self.config.surface_cofig.width + pos.x as usize] > z
     }
-    fn set_pixel_z(&mut self, pixel_pos: IVec2, color: u32, z: f64) {
+    fn set_pixel_z(&mut self, pixel_pos: IVec2, color: Color, z: f64) {
         if !self.pixel_fits(pixel_pos) {
             return;
         }
@@ -235,31 +246,25 @@ impl<VertexIn: VertexPos, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
             let pixel = self
                 .surface
                 .add(pixel_pos.y as usize * self.config.surface_cofig.width + pixel_pos.x as usize);
-            let bg_color_r = (*pixel << 8) >> 24;
-            let bg_color_g = (*pixel << 16) >> 24;
-            let bg_color_b = (*pixel << 24) >> 24;
-            let alpha = 1.0 - (color >> 24) as f64 / 0b1111_1111 as f64;
-            let color_r = (color << 8) >> 24;
-            let color_g = (color << 16) >> 24;
-            let color_b = (color << 24) >> 24;
+            let bg_color = Color { col: *pixel };
+            let alpha = 1.0 - color.ch.a  as f64 / 0b1111_1111 as f64;
 
-            //let bg_alpha = 1.0 - (*pixel >> 24) as f64 / 0b1111_1111 as f64;
-            //let alpha0 = alpha + bg_alpha * (1. - alpha);
-            //let out_color_r = ((alpha * color_r as f64 + (1. - alpha) * bg_color_r as f64 * bg_alpha as f64)/alpha0).round() as u32;
-            //let out_color_g = ((alpha * color_g as f64 + (1. - alpha) * bg_color_g as f64 * bg_alpha as f64)/alpha0).round() as u32;
-            //let out_color_b = ((alpha * color_b as f64 + (1. - alpha) * bg_color_b as f64 * bg_alpha as f64)/alpha0).round() as u32;
-
-            let out_color_r =
-                (alpha * color_r as f64 + (1. - alpha) * bg_color_r as f64).round() as u32;
-            let out_color_g =
-                (alpha * color_g as f64 + (1. - alpha) * bg_color_g as f64).round() as u32;
-            let out_color_b =
-                (alpha * color_b as f64 + (1. - alpha) * bg_color_b as f64).round() as u32;
-
-            *pixel = out_color_r << 16 | out_color_g << 8 | out_color_b;
+            let out_color = Color { ch:
+                                ColorChanels {
+                                    a: 0,
+                                    r: (alpha * color.ch.r as f64 + (1. - alpha) * bg_color.ch.r as f64).round() as u8,
+                                    g: (alpha * color.ch.g as f64 + (1. - alpha) * bg_color.ch.g as f64).round() as u8,
+                                    b: (alpha * color.ch.b as f64 + (1. - alpha) * bg_color.ch.b as f64).round() as u8,
+                                }};
+            *pixel = out_color.col;
         }
         self.zbuffer[p] = z;
     }
+    //let bg_alpha = 1.0 - (*pixel >> 24) as f64 / 0b1111_1111 as f64;
+    //let alpha0 = alpha + bg_alpha * (1. - alpha);
+    //let out_color_r = ((alpha * color_r as f64 + (1. - alpha) * bg_color_r as f64 * bg_alpha as f64)/alpha0).round() as u32;
+    //let out_color_g = ((alpha * color_g as f64 + (1. - alpha) * bg_color_g as f64 * bg_alpha as f64)/alpha0).round() as u32;
+    //let out_color_b = ((alpha * color_b as f64 + (1. - alpha) * bg_color_b as f64 * bg_alpha as f64)/alpha0).round() as u32;
 
     fn line(&mut self, start: &IVec2, end: &IVec2, color: u32) {
         let d_y: i64 = (end.y - start.y).abs();
@@ -314,10 +319,25 @@ impl<VertexIn: VertexPos, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
     /// Rasterize the triangle with the scanline algorithm
     fn fill_triangle_z_f(&mut self, p1: Vec3, p2: Vec3, p3: Vec3, c1: Color, c2: Color, c3: Color) {
         let mut points = vec![p1, p2, p3];
-        points.sort_by(|a, b| (a.y).total_cmp(&b.y));
+        let mut colors = vec![c1, c2, c3];
+        if points[0].y > points[1].y {
+            points.swap(0, 1);
+            colors.swap(0, 1);
+        }
+        if points[1].y > points[2].y {
+            points.swap(1, 2);
+            colors.swap(1, 2);
+        }
+        if points[0].y > points[1].y {
+            points.swap(0, 1);
+            colors.swap(0, 1);
+        }
         let p1 = points[0];
         let p2 = points[1];
         let p3 = points[2];
+        let c1 = colors[0];
+        let c2 = colors[1];
+        let c3 = colors[2];
 
         if p2.y == p3.y {
             self.fill_flat_bottom(p1, p2, p3, c1, c2, c3);
@@ -330,8 +350,12 @@ impl<VertexIn: VertexPos, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
             let z = zslope * (p2.y - p1.y) + p1.z;
             let y = p2.y;
             let d = vec3!(x, y, z);
-            self.fill_flat_bottom(p1, p2, d, c1, c2, c3);
-            self.fill_flat_top(d, p2, p3, c1, c2, c3);
+            // |vec(p1 -> d)| / |vec(p1 -> p3)|
+            let ratio = (vec3!(x,y,0.) - vec3!( p1.x, p1.y, 0.)).mag() / (vec3!(p3.x,p3.y,0.) - vec3!( p1.x, p1.y, 0.)).mag();
+            // blend c1 and c3
+            let color_d = c3 * ratio + c1 * (1. - ratio);
+            self.fill_flat_bottom(p1, p2, d, c1, c2, color_d);
+            self.fill_flat_top(d, p2, p3, color_d, c2, c3);
         }
     }
 
@@ -367,11 +391,13 @@ impl<VertexIn: VertexPos, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
                 let lambda2 = ((p3.y - p1.y) * (x as f64 - p3.x) + (p1.x - p3.x) * (y as f64 - p3.y)) / determinant;
                 let lambda3 = 1. - lambda1 - lambda2;
                 unsafe {
-                    let r = (c1.ch.r as f64 * lambda1 + c2.ch.r as f64 * lambda2 + c3.ch.r as f64 * lambda3).round() as u32;
-                    let g = (c1.ch.g as f64 * lambda1 + c2.ch.g as f64 * lambda2 + c3.ch.g as f64 * lambda3).round() as u32;
-                    let b = (c1.ch.b as f64 * lambda1 + c2.ch.b as f64 * lambda2 + c3.ch.b as f64 * lambda3).round() as u32;
-                    let alpha = c1.col >> 24;
-                    let color = alpha << 24 | r << 16 | g << 8 | b;
+                    let color = Color { ch: 
+                                        ColorChanels {
+                                            a: 0,
+                                            r: (c1.ch.r as f64 * lambda1 + c2.ch.r as f64 * lambda2 + c3.ch.r as f64 * lambda3).floor() as u8,
+                                            g: (c1.ch.g as f64 * lambda1 + c2.ch.g as f64 * lambda2 + c3.ch.g as f64 * lambda3).floor() as u8,
+                                            b: (c1.ch.b as f64 * lambda1 + c2.ch.b as f64 * lambda2 + c3.ch.b as f64 * lambda3).floor() as u8,
+                                        }};
                     self.set_pixel_z(ivec2!(x, y), color, z);
                 }
                 z += zinc;
@@ -415,11 +441,13 @@ impl<VertexIn: VertexPos, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
                 let lambda2 = ((p3.y - p1.y) * (x as f64 - p3.x) + (p1.x - p3.x) * (y as f64 - p3.y)) / determinant;
                 let lambda3 = 1. - lambda1 - lambda2;
                 unsafe {
-                    let r = (c1.ch.r as f64 * lambda1 + c2.ch.r as f64 * lambda2 + c3.ch.r as f64 * lambda3).round() as u32;
-                    let g = (c1.ch.g as f64 * lambda1 + c2.ch.g as f64 * lambda2 + c3.ch.g as f64 * lambda3).round() as u32;
-                    let b = (c1.ch.b as f64 * lambda1 + c2.ch.b as f64 * lambda2 + c3.ch.b as f64 * lambda3).round() as u32;
-                    let alpha = c1.col >> 24;
-                    let color = alpha << 24 | r << 16 | g << 8 | b;
+                    let color = Color { ch: 
+                                        ColorChanels {
+                                            a: 0,
+                                            r: (c1.ch.r as f64 * lambda1 + c2.ch.r as f64 * lambda2 + c3.ch.r as f64 * lambda3).floor() as u8,
+                                            g: (c1.ch.g as f64 * lambda1 + c2.ch.g as f64 * lambda2 + c3.ch.g as f64 * lambda3).floor() as u8,
+                                            b: (c1.ch.b as f64 * lambda1 + c2.ch.b as f64 * lambda2 + c3.ch.b as f64 * lambda3).floor() as u8,
+                                        }};
                     self.set_pixel_z(ivec2!(x, y), color, z);
                 }
                 z += zinc;
@@ -550,15 +578,17 @@ impl<VertexIn: VertexPos, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
                     triangles[i].col[2],
                 );
                 // FOR WIREFRAME
-                //self.draw_triangle_clip_wire(triangles[i][0], triangles[i][1], triangles[i][2], RED);
+                //self.draw_triangle_clip_wire(triangles[i].vert[0], triangles[i].vert[1], triangles[i].vert[2], ALPHA_HALF | RED);
             }
         } else {
             for t in triangles {
                 self.draw_triangle_clip_z(
                     t.vert[0], t.vert[1], t.vert[2], t.col[0], t.col[1], t.col[2],
                 );
+                //self.draw_triangle_clip_wire(t.vert[0], t.vert[1], t.vert[2], ALPHA_HALF | RED);
             }
         }
+        *DUMP.lock().unwrap() = 0;
     }
 }
 fn get_z_sorted_indeces(triangles: &mut Vec<TriangleV4>) -> Vec<(f64, usize)> {
@@ -636,17 +666,15 @@ fn clip_triangle_on_plane(
                 triangle.vert[inside_index_list[0]],
                 intersect_1.to_vec4(1.),
                 intersect_2.to_vec4(1.),
-                og_triangle.col[0],
-                og_triangle.col[1],
-                og_triangle.col[2],
-                //triangle.col[inside_index_list[0]],
-                //color_intersect1,
-                //color_intersect2,
+                triangle.col[inside_index_list[0]],
+                color_intersect1,
+                color_intersect2,
             );
             // If the index is 1 the out trianles will have a reverse winding order so i have to
             // account for that; if theres a better way to avoid this pls let me know
             if inside_index_list[0] == 1 {
                 out_triangle.vert.swap(1, 2);
+                out_triangle.col.swap(1, 2);
             }
             return vec![out_triangle];
         }
@@ -662,28 +690,33 @@ fn clip_triangle_on_plane(
                 triangle.vert[inside_index_list[1]].to_vec3(),
                 triangle.vert[outside_index_list[0]].to_vec3(),
             );
+            // if ratio == 0 then the color at the intersect is the color of the start vertex
+            let color_intersect1 = triangle.col[outside_index_list[0]] * ratio_1 + triangle.col[inside_index_list[0]] * (1. - ratio_1);
+            let color_intersect2 = triangle.col[outside_index_list[0]] * ratio_2 + triangle.col[inside_index_list[1]] * (1. - ratio_2);
 
             let mut out_triangle_1 = TriangleV4::new(
                 triangle.vert[inside_index_list[0]],
                 triangle.vert[inside_index_list[1]],
                 intersect_1.to_vec4(1.),
-                og_triangle.col[0],
-                og_triangle.col[1],
-                og_triangle.col[2],
+                triangle.col[inside_index_list[0]],
+                triangle.col[inside_index_list[1]],
+                color_intersect1,
             );
             let mut out_triangle_2 = TriangleV4::new(
                 intersect_2.to_vec4(1.),
                 intersect_1.to_vec4(1.),
                 triangle.vert[inside_index_list[1]],
-                og_triangle.col[0],
-                og_triangle.col[1],
-                og_triangle.col[2],
+                color_intersect2,
+                color_intersect1,
+                triangle.col[inside_index_list[1]],
             );
             // If the index is 1 the out trianles will have a reverse winding order so i have to
             // account for that; if theres a better way to avoid this pls let me know
             if outside_index_list[0] == 1 {
                 out_triangle_1.vert.swap(1, 2);
+                out_triangle_1.col.swap(1, 2);
                 out_triangle_2.vert.swap(1, 2);
+                out_triangle_2.col.swap(1, 2);
             }
             return vec![out_triangle_1, out_triangle_2];
         }
@@ -701,5 +734,6 @@ fn line_plane_intersect(plnae_p: Vec3, plane_n: Vec3, start: Vec3, end: Vec3) ->
     let t = (plane_d - plane_n.dot(start)) / plane_n.dot(line_d);
     let line_t = line_d * t;
     let intersect = start + line_t;
+    // intersect point and the (|start -> intersect| / |start -> end|)
     (intersect, line_t.mag()/line_d.mag())
 }

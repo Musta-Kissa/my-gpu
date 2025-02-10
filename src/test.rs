@@ -1,6 +1,7 @@
 use crate::SurfaceConfig;
 use crate::VertexPos;
 use crate::ALPHA_HALF;
+use crate::DUMP;
 use crate::LIGHT_BLUE;
 use crate::RED;
 use crate::RED_TRANSPARENT;
@@ -142,7 +143,7 @@ fn fragment(vert:&VertexOut, binds: &mut Binds) -> u32 {
     out
 }
 
-const RES: usize = 1080;
+const RES: usize = 600;
 #[test]
 fn main() {
     let mut window = Window::new("minifb", RES * 16 / 9, RES);
@@ -155,8 +156,10 @@ fn main() {
         up: vec3!(0., 1., 0.),
         //pos: Vec3 { x: 5.779785901190033, y: 4.8049999999999935, z: -9.057020099801605 },
         //dir: Vec3 { x: -0.4866490490059816, y: -0.23339999999999939, z: 0.873546408327325 },
-        pos: vec3!(2.5,2.5,-5.),
-        dir: vec3!(0.,0.,1.),
+        pos:Vec3 { x: 2.5, y: 2.5, z: -0.40079265285138027 },
+        dir:Vec3 { x: 0.0, y: 0.0, z: 1.0 },
+        //pos: vec3!(2.5,2.5,-5.),
+        //dir: vec3!(0.,0.,1.),
         speed: 0.005,
         near: 0.1,
         far: 100.,
@@ -170,7 +173,7 @@ fn main() {
     let config = my_gpu::Config {
         surface_cofig: surface_config,
     };
-    let mut light_dir = vec3!(-5.,-2.,-4.);
+    let mut light_dir = vec3!(0.,1.,0.);
 
     let mut binds: Binds = Binds(Vec::new());
     binds.push(&mut view_proj);
@@ -213,7 +216,7 @@ fn main() {
         gpu.clear(my_gpu::LIGHT_BLUE);
         //gpu.draw_indexed(&cube_sun_mesh.verts,&cube_sun_mesh.indices,false);
         //
-        //gpu.draw_indexed(&teapot_mesh2.verts,&teapot_mesh2.indices,false);
+        gpu.draw_indexed(&teapot_mesh2.verts,&teapot_mesh2.indices,false);
         //gpu.draw_indexed(&teapot_mesh3.verts,&teapot_mesh3.indices,false);
         gpu.draw_indexed(test_tri_vert,&vec![0,1,2],false);
 //
@@ -280,6 +283,17 @@ fn main() {
                     }
                     //Pitch Down
                     camera.dir.rot_quat(-1. * d_t / 16., camera.dir.cross(camera.up).norm());
+                }
+                _ => (),
+            }
+        }
+        for key in window.window.get_keys_pressed(minifb::KeyRepeat::No) {
+            use minifb::Key;
+            match key {
+                Key::M => {
+                    assert!(*DUMP.lock().unwrap() == 0);
+                    *DUMP.lock().unwrap() = 1;
+                    println!("DUMP = {}",*DUMP.lock().unwrap());
                 }
                 _ => (),
             }
