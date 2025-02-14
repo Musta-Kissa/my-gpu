@@ -213,7 +213,7 @@ fn main() {
     'draw_loop: while window.is_open() {
         let start = Instant::now();
 
-        gpu.clear(my_gpu::LIGHT_BLUE);
+        gpu.clear(my_gpu::BLACK);
         //gpu.draw_indexed(&cube_sun_mesh.verts,&cube_sun_mesh.indices,false);
         //
         gpu.draw_indexed(&teapot_mesh2.verts,&teapot_mesh2.indices,false);
