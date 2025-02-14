@@ -14,15 +14,11 @@ use std::ops::DerefMut;
 use std::ops::Mul;
 
 use my_math::matrix::Matrix;
-use my_math::vec;
 use my_math::vec::IVec2;
-use my_math::vec::Vec2;
 use my_math::vec::Vec3;
 use my_math::vec::Vec4;
 
 use std::sync::Mutex;
-
-pub static DUMP: Mutex<u32> = Mutex::new(0);
 
 pub const ALPHA_FULL: u32 = 0b1111_1111 << 24;
 pub const ALPHA_HALF: u32 = 0b0111_1111 << 24;
@@ -364,28 +360,17 @@ impl<VertexIn: VertexPos, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
         }
     }
     /// Rasterize the triangle with the scanline algorithm
-    fn fill_triangle_z_f(&mut self, p1: Vec3, p2: Vec3, p3: Vec3, c1: Color, c2: Color, c3: Color) {
-        let mut points = vec![p1, p2, p3];
-        let mut colors = vec![c1, c2, c3];
+    //fn fill_triangle_z_f(&mut self, p1: Vec3, p2: Vec3, p3: Vec3, c1: Color, c2: Color, c3: Color) {
+    fn fill_triangle_z_f(&mut self, t: TriangleV3) {
+        let mut verts = t.v;
+        verts.sort_by(|a,b| (a.pos.y).total_cmp(&b.pos.y));
         // sort by y
-        if points[0].y > points[1].y {
-            points.swap(0, 1);
-            colors.swap(0, 1);
-        }
-        if points[1].y > points[2].y {
-            points.swap(1, 2);
-            colors.swap(1, 2);
-        }
-        if points[0].y > points[1].y {
-            points.swap(0, 1);
-            colors.swap(0, 1);
-        }
-        let p1 = points[0];
-        let p2 = points[1];
-        let p3 = points[2];
-        let c1 = colors[0];
-        let c2 = colors[1];
-        let c3 = colors[2];
+        let p1 = verts[0].pos;
+        let p2 = verts[1].pos;
+        let p3 = verts[2].pos;
+        let c1 = verts[0].col;
+        let c2 = verts[1].col;
+        let c3 = verts[2].col;
 
         if p2.y == p3.y {
             self.fill_flat_bottom(p1, p2, p3, c1, c2, c3);
@@ -516,17 +501,11 @@ impl<VertexIn: VertexPos, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
     }
 
     fn draw_triangle_clip_z(
-        &mut self,
-        p1: Vec4,
-        p2: Vec4,
-        p3: Vec4,
-        c1: Color,
-        c2: Color,
-        c3: Color,
+        &mut self, t: TriangleV4
     ) {
-        let p1 = self.clip_to_screen_v3(p1);
-        let p2 = self.clip_to_screen_v3(p2);
-        let p3 = self.clip_to_screen_v3(p3);
+        let p1 = self.clip_to_screen_v3(t[0].pos);
+        let p2 = self.clip_to_screen_v3(t[1].pos);
+        let p3 = self.clip_to_screen_v3(t[2].pos);
 
         let edge12 = p2 - p1;
         let edge13 = p3 - p1;
@@ -535,8 +514,9 @@ impl<VertexIn: VertexPos, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
             //self.fill_triangle_z(p1, p2, p3, RED);
             return;
         }
+        let t3 = TriangleV3::new(p1, p2, p3, t[0].col, t[1].col, t[2].col);
 
-        self.fill_triangle_z_f(p1, p2, p3, c1, c2, c3);
+        self.fill_triangle_z_f(t3);
     }
 
     fn draw_triangle_clip_wire(&mut self, p1: Vec4, p2: Vec4, p3: Vec4, color: u32) {
@@ -600,18 +580,11 @@ impl<VertexIn: VertexPos, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
 
             let fragment_shader = self.fragment_shader;
 
-            let color1 = Color {
-                col: fragment_shader(&p1, &mut self.binds),
-            };
-            let color2 = Color {
-                col: fragment_shader(&p2, &mut self.binds),
-            };
-            let color3 = Color {
-                col: fragment_shader(&p3, &mut self.binds),
-            };
+            let color1 = Color { col: fragment_shader(&p1, &mut self.binds), };
+            let color2 = Color { col: fragment_shader(&p2, &mut self.binds), };
+            let color3 = Color { col: fragment_shader(&p3, &mut self.binds), };
 
-            let mut triangle_from_clip =
-                vec![TriangleV4::new(pos1, pos2, pos3, color1, color2, color3)];
+            let mut triangle_from_clip = vec![TriangleV4::new(pos1, pos2, pos3, color1, color2, color3)];
 
             // Clip triangles to the screen
             for i in 0..normals.len() {
@@ -626,26 +599,13 @@ impl<VertexIn: VertexPos, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
         if sort {
             let sorted_indeces = get_z_sorted_indeces(&mut triangles);
             for (_, i) in sorted_indeces {
-                self.draw_triangle_clip_z(
-                    triangles[i][0].pos,
-                    triangles[i][1].pos,
-                    triangles[i][2].pos,
-                    triangles[i][0].col,
-                    triangles[i][1].col,
-                    triangles[i][2].col,
-                );
-                // FOR WIREFRAME
-                //self.draw_triangle_clip_wire(triangles[i].vert[0], triangles[i].vert[1], triangles[i].vert[2], ALPHA_HALF | RED);
+                self.draw_triangle_clip_z(triangles[i]);
             }
         } else {
             for t in triangles {
-                self.draw_triangle_clip_z(
-                    t[0].pos, t[1].pos, t[2].pos, t[0].col, t[1].col, t[2].col,
-                );
-                //self.draw_triangle_clip_wire(t.vert[0], t.vert[1], t.vert[2], ALPHA_HALF | RED);
+                self.draw_triangle_clip_z(t);
             }
         }
-        *DUMP.lock().unwrap() = 0;
     }
 }
 fn get_z_sorted_indeces(triangles: &mut Vec<TriangleV4>) -> Vec<(f64, usize)> {

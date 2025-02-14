@@ -1,7 +1,6 @@
 use crate::SurfaceConfig;
 use crate::VertexPos;
 use crate::ALPHA_HALF;
-use crate::DUMP;
 use crate::LIGHT_BLUE;
 use crate::RED;
 use crate::RED_TRANSPARENT;
@@ -156,10 +155,10 @@ fn main() {
         up: vec3!(0., 1., 0.),
         //pos: Vec3 { x: 5.779785901190033, y: 4.8049999999999935, z: -9.057020099801605 },
         //dir: Vec3 { x: -0.4866490490059816, y: -0.23339999999999939, z: 0.873546408327325 },
-        pos:Vec3 { x: 2.5, y: 2.5, z: -0.40079265285138027 },
-        dir:Vec3 { x: 0.0, y: 0.0, z: 1.0 },
-        //pos: vec3!(2.5,2.5,-5.),
-        //dir: vec3!(0.,0.,1.),
+        //pos:Vec3 { x: 2.5, y: 2.5, z: -0.40079265285138027 },
+        //dir:Vec3 { x: 0.0, y: 0.0, z: 1.0 },
+        pos: vec3!(2.5,2.5,-5.),
+        dir: vec3!(0.,0.,1.),
         speed: 0.005,
         near: 0.1,
         far: 100.,
@@ -291,9 +290,6 @@ fn main() {
             use minifb::Key;
             match key {
                 Key::M => {
-                    assert!(*DUMP.lock().unwrap() == 0);
-                    *DUMP.lock().unwrap() = 1;
-                    println!("DUMP = {}",*DUMP.lock().unwrap());
                 }
                 _ => (),
             }
