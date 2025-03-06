@@ -215,7 +215,7 @@ fn main() {
         gpu.clear(my_gpu::BLACK);
         //gpu.draw_indexed(&cube_sun_mesh.verts,&cube_sun_mesh.indices,false);
         //
-        gpu.draw_indexed(&teapot_mesh2.verts,&teapot_mesh2.indices,false);
+        //gpu.draw_indexed(&teapot_mesh2.verts,&teapot_mesh2.indices,false);
         //gpu.draw_indexed(&teapot_mesh3.verts,&teapot_mesh3.indices,false);
         gpu.draw_indexed(test_tri_vert,&vec![0,1,2],false);
 //
