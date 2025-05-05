@@ -74,14 +74,14 @@ impl Add<Color> for Color {
         }
     }
 }
-fn blend_color(c1: Color, c2: Color, ratio: f64) -> Color {
+fn blend_color(c1: Color, c2: Color, ratio: f32) -> Color {
     unsafe {
         Color {
             ch: ColorChanels {
                 a: c1.ch.a,
-                r: (c1.ch.r as f64 * ratio + c2.ch.r as f64 * (1. - ratio)).round() as u8,
-                g: (c1.ch.g as f64 * ratio + c2.ch.g as f64 * (1. - ratio)).round() as u8,
-                b: (c1.ch.b as f64 * ratio + c2.ch.b as f64 * (1. - ratio)).round() as u8,
+                r: (c1.ch.r as f32 * ratio + c2.ch.r as f32 * (1. - ratio)).round() as u8,
+                g: (c1.ch.g as f32 * ratio + c2.ch.g as f32 * (1. - ratio)).round() as u8,
+                b: (c1.ch.b as f32 * ratio + c2.ch.b as f32 * (1. - ratio)).round() as u8,
             },
         }
     }
@@ -218,7 +218,7 @@ pub struct Gpu<VertexIn, VertexOut> {
     surface: *mut u32,
     binds: Binds,
 
-    zbuffer: Vec<f64>,
+    zbuffer: Vec<f32>,
 
     vertex_shader: fn(&VertexIn, &mut Binds) -> VertexOut,
     fragment_shader: fn(&VertexOut, &mut Binds) -> u32,
@@ -238,7 +238,7 @@ impl<VertexIn: VertexPos, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
             config,
             surface,
             binds,
-            zbuffer: vec![1.0f64; config.surface_cofig.width * config.surface_cofig.height],
+            zbuffer: vec![1.0f32; config.surface_cofig.width * config.surface_cofig.height],
             vertex_shader,
             fragment_shader,
         }
@@ -246,8 +246,8 @@ impl<VertexIn: VertexPos, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
     fn pixel_fits(&self, pixel: IVec2) -> bool {
         !(pixel.y < 0
             || pixel.x < 0
-            || pixel.y >= self.config.surface_cofig.height as i64
-            || pixel.x >= self.config.surface_cofig.width as i64)
+            || pixel.y >= self.config.surface_cofig.height as i32
+            || pixel.x >= self.config.surface_cofig.width as i32)
     }
 
     fn set_pixel(&mut self, pixel: IVec2, color: u32) {
@@ -262,13 +262,13 @@ impl<VertexIn: VertexPos, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
                 .add(pixel.y as usize * self.config.surface_cofig.width + pixel.x as usize) = color;
         }
     }
-    fn check_z(&mut self, pos: IVec2, z: f64) -> bool {
+    fn check_z(&mut self, pos: IVec2, z: f32) -> bool {
         if !self.pixel_fits(pos) {
             return false;
         }
         self.zbuffer[pos.y as usize * self.config.surface_cofig.width + pos.x as usize] > z
     }
-    fn set_pixel_z(&mut self, pixel_pos: IVec2, color: Color, z: f64) {
+    fn set_pixel_z(&mut self, pixel_pos: IVec2, color: Color, z: f32) {
         if !self.pixel_fits(pixel_pos) {
             return;
         }
@@ -286,16 +286,16 @@ impl<VertexIn: VertexPos, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
                 .surface
                 .add(pixel_pos.y as usize * self.config.surface_cofig.width + pixel_pos.x as usize);
             let bg_color = Color { col: *pixel };
-            let alpha = 1.0 - color.ch.a as f64 / 0b1111_1111 as f64;
+            let alpha = 1.0 - color.ch.a as f32 / 0b1111_1111 as f32;
 
             let out_color = Color {
                 ch: ColorChanels {
                     a: 0,
-                    r: (alpha * color.ch.r as f64 + (1. - alpha) * bg_color.ch.r as f64).round()
+                    r: (alpha * color.ch.r as f32 + (1. - alpha) * bg_color.ch.r as f32).round()
                         as u8,
-                    g: (alpha * color.ch.g as f64 + (1. - alpha) * bg_color.ch.g as f64).round()
+                    g: (alpha * color.ch.g as f32 + (1. - alpha) * bg_color.ch.g as f32).round()
                         as u8,
-                    b: (alpha * color.ch.b as f64 + (1. - alpha) * bg_color.ch.b as f64).round()
+                    b: (alpha * color.ch.b as f32 + (1. - alpha) * bg_color.ch.b as f32).round()
                         as u8,
                 },
             };
@@ -310,11 +310,11 @@ impl<VertexIn: VertexPos, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
     //let out_color_b = ((alpha * color_b as f64 + (1. - alpha) * bg_color_b as f64 * bg_alpha as f64)/alpha0).round() as u32;
 
     fn line(&mut self, start: &IVec2, end: &IVec2, color: u32) {
-        let d_y: i64 = (end.y - start.y).abs();
-        let d_x: i64 = (end.x - start.x).abs();
+        let d_y: i32 = (end.y - start.y).abs();
+        let d_x: i32 = (end.x - start.x).abs();
 
-        let s_x: i64 = if start.x < end.x { 1_i64 } else { -1_i64 };
-        let s_y: i64 = if start.y < end.y { 1_i64 } else { -1_i64 };
+        let s_x: i32 = if start.x < end.x { 1_i32 } else { -1_i32 };
+        let s_y: i32 = if start.y < end.y { 1_i32 } else { -1_i32 };
 
         let mut curr_y = start.y;
         let mut curr_x = start.x;
@@ -338,15 +338,15 @@ impl<VertexIn: VertexPos, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
     fn clip_to_screen_v3(&self, pos: Vec4) -> Vec3 {
         // already devided when clipping
         //let pos = pos / pos.w;
-        let s_x = (pos.x + 1.) * self.config.surface_cofig.width as f64 / 2.;
-        let s_y = (-pos.y + 1.) * self.config.surface_cofig.height as f64 / 2.;
+        let s_x = (pos.x + 1.) * self.config.surface_cofig.width as f32 / 2.;
+        let s_y = (-pos.y + 1.) * self.config.surface_cofig.height as f32 / 2.;
         vec3!(s_x, s_y, pos.z)
     }
     fn clip_to_screen(&self, pos: Vec4) -> IVec2 {
         let pos = pos / pos.w;
-        let s_x: i64 = ((pos.x + 1.) * self.config.surface_cofig.width as f64 / 2.).floor() as i64;
-        let s_y: i64 =
-            ((-pos.y + 1.) * self.config.surface_cofig.height as f64 / 2.).floor() as i64;
+        let s_x: i32 = ((pos.x + 1.) * self.config.surface_cofig.width as f32 / 2.).floor() as i32;
+        let s_y: i32 =
+            ((-pos.y + 1.) * self.config.surface_cofig.height as f32 / 2.).floor() as i32;
         ivec2!(s_x, s_y)
     }
 
@@ -418,21 +418,21 @@ impl<VertexIn: VertexPos, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
 
         let determinant = (p2.y - p3.y) * (p1.x - p3.x) + (p3.x - p2.x) * (p1.y - p3.y);
 
-        for y in p1.y.floor() as i64..p3.y.floor() as i64 {
+        for y in p1.y.floor() as i32..p3.y.floor() as i32 {
             let zinc = (zright - zleft) / (x23 - x13);
             let mut z = zleft + zinc * (1. - x13.fract());
 
-            for x in x13.ceil() as i64..x23.ceil() as i64 {
-                let lambda1 = ((p2.y - p3.y) * (x as f64 - p3.x) + (p3.x - p2.x) * (y as f64 - p3.y)) / determinant;
-                let lambda2 = ((p3.y - p1.y) * (x as f64 - p3.x) + (p1.x - p3.x) * (y as f64 - p3.y)) / determinant;
+            for x in x13.ceil() as i32..x23.ceil() as i32 {
+                let lambda1 = ((p2.y - p3.y) * (x as f32 - p3.x) + (p3.x - p2.x) * (y as f32 - p3.y)) / determinant;
+                let lambda2 = ((p3.y - p1.y) * (x as f32 - p3.x) + (p1.x - p3.x) * (y as f32 - p3.y)) / determinant;
                 let lambda3 = 1. - lambda1 - lambda2;
                 unsafe {
                     let color = Color {
                         ch: ColorChanels {
                             a: 0,
-                            r: (c1.ch.r as f64 * lambda1 + c2.ch.r as f64 * lambda2 + c3.ch.r as f64 * lambda3) .floor() as u8,
-                            g: (c1.ch.g as f64 * lambda1 + c2.ch.g as f64 * lambda2 + c3.ch.g as f64 * lambda3) .floor() as u8,
-                            b: (c1.ch.b as f64 * lambda1 + c2.ch.b as f64 * lambda2 + c3.ch.b as f64 * lambda3) .floor() as u8,
+                            r: (c1.ch.r as f32 * lambda1 + c2.ch.r as f32 * lambda2 + c3.ch.r as f32 * lambda3) .floor() as u8,
+                            g: (c1.ch.g as f32 * lambda1 + c2.ch.g as f32 * lambda2 + c3.ch.g as f32 * lambda3) .floor() as u8,
+                            b: (c1.ch.b as f32 * lambda1 + c2.ch.b as f32 * lambda2 + c3.ch.b as f32 * lambda3) .floor() as u8,
                         },
                     };
                     //let z = p1.z * lambda1 + p2.z * lambda2 + p3.z * lambda3;
@@ -470,21 +470,21 @@ impl<VertexIn: VertexPos, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
 
         let determinant = (p2.y - p3.y) * (p1.x - p3.x) + (p3.x - p2.x) * (p1.y - p3.y);
 
-        for y in p1.y.floor() as i64..p2.y.floor() as i64 {
+        for y in p1.y.floor() as i32..p2.y.floor() as i32 {
             let zinc = (zright - zleft) / (x13 - x12);
             let mut z = zleft + zinc * (1. - x12.fract());
 
-            for x in x12.ceil() as i64..x13.ceil() as i64 {
-                let lambda1 = ((p2.y - p3.y) * (x as f64 - p3.x) + (p3.x - p2.x) * (y as f64 - p3.y)) / determinant;
-                let lambda2 = ((p3.y - p1.y) * (x as f64 - p3.x) + (p1.x - p3.x) * (y as f64 - p3.y)) / determinant;
+            for x in x12.ceil() as i32..x13.ceil() as i32 {
+                let lambda1 = ((p2.y - p3.y) * (x as f32 - p3.x) + (p3.x - p2.x) * (y as f32 - p3.y)) / determinant;
+                let lambda2 = ((p3.y - p1.y) * (x as f32 - p3.x) + (p1.x - p3.x) * (y as f32 - p3.y)) / determinant;
                 let lambda3 = 1. - lambda1 - lambda2;
                 unsafe {
                     let color = Color {
                         ch: ColorChanels {
                             a: 0,
-                            r: (c1.ch.r as f64 * lambda1 + c2.ch.r as f64 * lambda2 + c3.ch.r as f64 * lambda3) .floor() as u8,
-                            g: (c1.ch.g as f64 * lambda1 + c2.ch.g as f64 * lambda2 + c3.ch.g as f64 * lambda3) .floor() as u8,
-                            b: (c1.ch.b as f64 * lambda1 + c2.ch.b as f64 * lambda2 + c3.ch.b as f64 * lambda3) .floor() as u8,
+                            r: (c1.ch.r as f32 * lambda1 + c2.ch.r as f32 * lambda2 + c3.ch.r as f32 * lambda3) .floor() as u8,
+                            g: (c1.ch.g as f32 * lambda1 + c2.ch.g as f32 * lambda2 + c3.ch.g as f32 * lambda3) .floor() as u8,
+                            b: (c1.ch.b as f32 * lambda1 + c2.ch.b as f32 * lambda2 + c3.ch.b as f32 * lambda3) .floor() as u8,
                         },
                     };
                     //let z = p1.z * lambda1 + p2.z * lambda2 + p3.z * lambda3;
@@ -539,7 +539,7 @@ impl<VertexIn: VertexPos, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
     pub fn draw_indexed(&mut self, vertex_buffer: &[VertexIn], index_buffer: &[u32], sort: bool) {
         struct Sort {
             indecies: [u32; 3],
-            weight: f64,
+            weight: f32,
         }
         let normals = &[
             vec3!(0., 0., 1.),
@@ -608,8 +608,8 @@ impl<VertexIn: VertexPos, VertexOut: ClipPos> Gpu<VertexIn, VertexOut> {
         }
     }
 }
-fn get_z_sorted_indeces(triangles: &mut Vec<TriangleV4>) -> Vec<(f64, usize)> {
-    let mut weights: Vec<(f64, usize)> = Vec::with_capacity(triangles.len());
+fn get_z_sorted_indeces(triangles: &mut Vec<TriangleV4>) -> Vec<(f32, usize)> {
+    let mut weights: Vec<(f32, usize)> = Vec::with_capacity(triangles.len());
     for (i, t) in triangles.iter().enumerate() {
         // Not dividing by w because already did that when clippling and w == 1
         let weight = (t[0].pos.z + t[1].pos.z + t[2].pos.z) / 3.;
@@ -749,7 +749,7 @@ fn clip_triangle_on_plane(
     }
 }
 
-fn line_plane_intersect(plane_p: Vec3, plane_n: Vec3, start: Vec3, end: Vec3) -> (Vec3, f64) {
+fn line_plane_intersect(plane_p: Vec3, plane_n: Vec3, start: Vec3, end: Vec3) -> (Vec3, f32) {
     let line_d = end - start;
     let plane_d = plane_n.dot(plane_p);
 

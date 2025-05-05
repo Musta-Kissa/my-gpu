@@ -16,7 +16,7 @@ use std::time::Instant;
 use crate as my_gpu;
 
 struct Window {
-    window: minifb::Window,
+    window: minifb::Window, 
     framebuffer: Framebuffer,
 }
 impl Window {
@@ -66,10 +66,10 @@ struct Camera {
     pos: Vec3,
     up: Vec3,
     dir: Vec3,
-    speed: f64,
-    near: f64,
-    far: f64,
-    fov: f64,
+    speed: f32,
+    near: f32,
+    far: f32,
+    fov: f32,
 }
 impl Camera {
     fn right(&self) -> Vec3 {
@@ -131,9 +131,9 @@ fn fragment(vert:&VertexOut, binds: &mut Binds) -> u32 {
     let dot_light = light_dir.norm().dot(vert.norm);
     let dim_ratio = (dot_light + 1.)/2.;
 
-    let r_col = (( (vert.color << 08) >> 24) as f64 * dim_ratio).round() as u32 | ambient;
-    let g_col = (( (vert.color << 16) >> 24) as f64 * dim_ratio).round() as u32 | ambient;
-    let b_col = (( (vert.color << 24) >> 24) as f64 * dim_ratio).round() as u32 | ambient;
+    let r_col = (( (vert.color << 08) >> 24) as f32 * dim_ratio).round() as u32 | ambient;
+    let g_col = (( (vert.color << 16) >> 24) as f32 * dim_ratio).round() as u32 | ambient;
+    let b_col = (( (vert.color << 24) >> 24) as f32 * dim_ratio).round() as u32 | ambient;
     let mut out = 0u32;
     out = out | (r_col << 16);
     out = out | (g_col << 8);
@@ -164,7 +164,7 @@ fn main() {
         far: 100.,
         fov: 60.,
     };
-
+ 
     let mut cam_trans_mat = my_math::matrix::look_at_lh(camera.pos, camera.pos + camera.dir, camera.up);
     let mut proj = my_math::matrix::proj_mat_wgpu(camera.fov, 16. / 9., camera.near, camera.far);
     let mut view_proj = proj * cam_trans_mat;
@@ -213,17 +213,17 @@ fn main() {
         let start = Instant::now();
 
         gpu.clear(my_gpu::BLACK);
-        //gpu.draw_indexed(&cube_sun_mesh.verts,&cube_sun_mesh.indices,false);
+        gpu.draw_indexed(&cube_sun_mesh.verts,&cube_sun_mesh.indices,false);
         //
         //gpu.draw_indexed(&teapot_mesh2.verts,&teapot_mesh2.indices,false);
         //gpu.draw_indexed(&teapot_mesh3.verts,&teapot_mesh3.indices,false);
         gpu.draw_indexed(test_tri_vert,&vec![0,1,2],false);
 //
         //gpu.draw_indexed(&cube_mesh1.verts,&cube_mesh1.indices,true);
-        //gpu.draw_indexed(&teapot_mesh1.verts,&teapot_mesh1.indices,true);
+        gpu.draw_indexed(&teapot_mesh1.verts,&teapot_mesh1.indices,true);
         window.display();
 
-        let d_t = start.elapsed().as_millis() as f64;
+        let d_t = start.elapsed().as_millis() as f32;
         window.window.set_title(&format!("{:.2}fps ({}ms)",1./(d_t / 1000.),d_t));
 
         for key in window.window.get_keys() {
@@ -334,16 +334,16 @@ impl Mesh {
             match tokens[0] {
                 "v" => {
                     //println!("vert");
-                    let x:f64 = tokens[1].to_string().parse().expect("couldnt parse x of vert");
-                    let y:f64 = tokens[2].to_string().parse().expect("couldnt parse y of vert");
-                    let z:f64 = tokens[3].to_string().parse().expect("couldnt parse z of vert");
+                    let x:f32 = tokens[1].to_string().parse().expect("couldnt parse x of vert");
+                    let y:f32 = tokens[2].to_string().parse().expect("couldnt parse y of vert");
+                    let z:f32 = tokens[3].to_string().parse().expect("couldnt parse z of vert");
                     verts.push(vec3!(x,y,z)+pos);
                 }
                 "vn" => {
                     //println!("vert normal");
-                    let x:f64 = tokens[1].to_string().parse().expect("couldnt parse x of normal");
-                    let y:f64 = tokens[2].to_string().parse().expect("couldnt parse y of normal");
-                    let z:f64 = tokens[3].to_string().parse().expect("couldnt parse z of normal");
+                    let x:f32 = tokens[1].to_string().parse().expect("couldnt parse x of normal");
+                    let y:f32 = tokens[2].to_string().parse().expect("couldnt parse y of normal");
+                    let z:f32 = tokens[3].to_string().parse().expect("couldnt parse z of normal");
                     normals.push(vec3!(x,y,z));
                 }
                 "f" => {
